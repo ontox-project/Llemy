@@ -1,0 +1,243 @@
+"""
+Streamlit UI for Fatty Acid Assistant
+
+This module provides a user interface for interacting with the Fatty Acid Assistant,
+allowing users to ask questions about lipid biology and view comprehensive answers.
+"""
+
+import streamlit as st
+from workflow import assistant_chain
+from dotenv import load_dotenv
+import time
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Check if API keys are set
+def check_api_keys():
+    missing_keys = []
+    if not os.environ.get("ONTOX_TOKEN"):
+        missing_keys.append("ONTOX_TOKEN")
+    if not os.environ.get("PPLX_API_KEY"):
+        missing_keys.append("PPLX_API_KEY")
+    if not os.environ.get("OPENAI_API_KEY"):
+        missing_keys.append("OPENAI_API_KEY")
+    
+    return missing_keys
+
+# Set up the Streamlit page
+st.set_page_config(
+    page_title="Steato-Hepatic Explorer",
+    page_icon="🧪",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for better appearance
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #2E86C1;
+    }
+    .sub-header {
+        font-size: 1.5rem;
+        color: #5D6D7E;
+    }
+    .stAlert {
+        background-color: #F8F9F9;
+        border-color: #D5D8DC;
+    }
+    .info-box {
+        background-color: #EBF5FB;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .stChatMessage {
+        background-color: #F4F6F7;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Application header
+st.markdown("<h1 class='main-header'>Steato-Hepatic Explorer</h1>", unsafe_allow_html=True)
+st.markdown("<h3 class='sub-header'>A Multi-Agent System for Lipid Biology Research</h3>", unsafe_allow_html=True)
+
+# Sidebar for settings and info
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2021/2021815.png", width=100)
+    st.markdown("## About")
+    
+    st.markdown("""
+    This application helps researchers explore questions about lipid metabolism in the liver.
+    
+    It combines:
+    - Structured data from the Ontox MINERVA API
+    - Web research from Perplexity
+    - AI synthesis for comprehensive answers
+    """)
+    
+    st.markdown("---")
+    st.markdown("## Example Questions")
+    
+    example_questions = [
+        "List three specific inhibitors of CD36 and tell me which general molecular processes would be mainly impaired",
+        "Tell me an alternative to FATP2 if I want to test for the functionality of bile canalicular efflux",
+        "What protein or protein combinations should I measure if I want to assess HDL secretion?",
+        "In what organelle are fatty acids mainly stored in a cell system not expressing FABP1?",
+        "What are the differential molecular processes inhibited when PPAR alpha and PPAR gamma are inhibited?",
+        "Is PPAR alpha involved in the uptake of fatty acids?",
+        "How is BSEP related to fatty acid beta oxidation?",
+        "How does FATP1 inhibition in the liver affect the homeostasis of cholesterol?",
+        "Which cell types should I include in an in vitro model of steatohepatitis?",
+        "What is the abundance of FATP transporters in the liver?",
+        "Is valproic acid inhibitor of OTG2?"
+    ]
+    
+    for q in example_questions:
+        if st.button(q[:50] + "..." if len(q) > 50 else q):
+            st.session_state.query = q
+    
+    st.markdown("---")
+    st.markdown("### Performance Metrics")
+    if "response_time" in st.session_state:
+        st.metric("Last Response Time", f"{st.session_state.response_time:.2f}s")
+
+# Check for missing API keys
+missing_keys = check_api_keys()
+if missing_keys:
+    st.error(f"Missing API key(s): {', '.join(missing_keys)}. Please add them to your .env file.")
+    st.info("""
+    To set up your API keys:
+    1. Edit the `.env` file in the project directory
+    2. Add your API keys in the format:
+       ```
+       ONTOX_TOKEN=your_token_here
+       PPLX_API_KEY=your_key_here
+       OPENAI_API_KEY=your_key_here
+       ```
+    3. Restart the application
+    """)
+    st.stop()
+
+# Initialize session state for chat history
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+if "query" not in st.session_state:
+    st.session_state.query = ""
+
+# Function to process the query
+def process_query(query):
+    start_time = time.time()
+    
+    api_status_details = None
+    web_status_details = None
+    
+    with st.spinner("Retrieving knowledge from Ontox API and performing web research..."):
+        try:
+            result = assistant_chain.invoke({"question": query})
+            answer = result.get("final_answer", "Error: No response generated.")
+            api_status_details = result.get("api_status_details")
+            web_status_details = result.get("web_status_details")
+        except Exception as e:
+            answer = f"Error processing your query: {str(e)}"
+            # Ensure status details are initialized even on error to prevent NoneType issues later
+            api_status_details = {"status": "error", "error_message": str(e)}
+            web_status_details = {"status": "error", "error_message": str(e)}
+
+    end_time = time.time()
+    st.session_state.response_time = end_time - start_time
+    
+    return answer, api_status_details, web_status_details
+
+# Main chat interface
+query = st.chat_input("Ask about lipid biology, transporters, or metabolism...", key="chat_input")
+
+# Process query from session state (if set by example button)
+if st.session_state.query and not query:
+    query = st.session_state.query
+    st.session_state.query = ""  # Clear it after use
+
+if query:
+    # Add user query to history
+    st.session_state.history.append({"role": "user", "content": query, "api_status": None, "web_status": None, "ontox_data": None})
+    
+    # Process the query
+    answer, api_status, web_status = process_query(query)
+    
+    # Extract Ontox raw data if available from the result
+    ontox_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
+
+    # Add assistant response to history
+    st.session_state.history.append({
+        "role": "assistant", 
+        "content": answer, 
+        "api_status": api_status, 
+        "web_status": web_status,
+        "ontox_data": ontox_data # Store the raw Ontox data
+    })
+
+# Display chat history
+for message in st.session_state.history:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        # Display Ontox raw data if available for assistant messages
+        if message["role"] == "assistant" and message.get("ontox_data"):
+             with st.expander("Ontox API Data Retrieved", expanded=False):
+                 st.text_area("Raw Data:", value=message["ontox_data"], height=200, disabled=True)
+        
+        # Display API Call Status
+        if message["role"] == "assistant" and message.get("api_status"):
+            with st.expander("API Call Status Details", expanded=False):
+                st.markdown("##### Ontox API")
+                ontox_status = message["api_status"]
+                if ontox_status["status"] == "success":
+                    st.success(f"Status: {ontox_status['status']}")
+                    # st.text_area("Data Snippet:", value=str(ontox_status.get('data', ''))[:200]+"...", height=100, disabled=True)
+                elif ontox_status["status"] == "no_data_found":
+                    st.warning(f"Status: {ontox_status['status']}")
+                    st.caption(f"Details: {ontox_status.get('data', 'No specific message.')}")
+                else: # error
+                    st.error(f"Status: {ontox_status['status']}")
+                    st.caption(f"Error: {ontox_status.get('error_message', 'Unknown error')}")
+
+                st.markdown("##### Perplexity API")
+                perplexity_status = message["web_status"]
+                if perplexity_status["status"] == "success":
+                    st.success(f"Status: {perplexity_status['status']}")
+                    # st.text_area("Data Snippet:", value=str(perplexity_status.get('data', ''))[:200]+"...", height=100, disabled=True)
+                else: # error
+                    st.error(f"Status: {perplexity_status['status']}")
+                    st.caption(f"Error: {perplexity_status.get('error_message', 'Unknown error')}")
+
+
+# Display a getting started message if history is empty
+if not st.session_state.history:
+    st.info("""
+    ## Welcome to the Steato-Hepatic Explorer!
+    
+    Ask questions about lipid biology and metabolism in the liver.
+    
+    You can:
+    - Type your own question in the input box below
+    - Try one of the example questions from the sidebar
+    
+    The system will combine information from the Ontox MINERVA API and web research to provide comprehensive answers.
+    """)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+*This is a prototype application for research purposes only.  
+Developed with Streamlit, LangChain, and Perplexity.*
+""")
+
+if __name__ == "__main__":
+    # This will only execute when the script is run directly
+    pass
