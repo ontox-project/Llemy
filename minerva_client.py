@@ -1,7 +1,7 @@
 """
-Ontox MINERVA API Client (Refactored for Full Map Data Retrieval)
+MINERVA API Client (Refactored for Full Map Data Retrieval)
 
-This module provides a client for interacting with the Ontox MINERVA API.
+This module provides a client for interacting with the MINERVA API.
 It fetches all elements and reactions from a specified project map and formats
 them into a descriptive text for LLM processing, including reaction references.
 Handles authentication via anonymous login with fallback to a pre-saved token.
@@ -42,13 +42,13 @@ class MinervaClient(httpx.Client):
             response.raise_for_status()
             log.info("MINERVA Client: Anonymous login successful.")
         except httpx.HTTPStatusError as e:
-            log.warning(f"MINERVA Client: Anonymous login failed ({e.response.status_code}). Attempting fallback to ONTOX_TOKEN.")
-            token = os.getenv("ONTOX_TOKEN")
+            log.warning(f"MINERVA Client: Anonymous login failed ({e.response.status_code}). Attempting fallback to MINERVA_TOKEN.")
+            token = os.getenv("MINERVA_TOKEN")
             if not token:
-                log.error("MINERVA Client: ONTOX_TOKEN not found. Authentication failed.")
-                raise ValueError("MINERVA authentication failed. Anonymous login rejected and no ONTOX_TOKEN provided.") from e
+                log.error("MINERVA Client: MINERVA_TOKEN not found. Authentication failed.")
+                raise ValueError("MINERVA authentication failed. Anonymous login rejected and no MINERVA_TOKEN provided.") from e
             self.cookies.set("MINERVA_AUTH_TOKEN", token, domain="ontox.elixir-luxembourg.org")
-            log.info("MINERVA Client: Using pre-saved ONTOX_TOKEN.")
+            log.info("MINERVA Client: Using pre-saved MINERVA_TOKEN.")
         except Exception as e:
             log.error(f"MINERVA Client: Unexpected error during authentication: {str(e)}")
             raise
@@ -65,8 +65,9 @@ class MinervaClient(httpx.Client):
         if 'projectId' not in path and 'projectId' not in params:
              if path.startswith(("/projects/", "/models/", "/bioEntities/")) or "/models/" in path :
                  pass
-             elif path.startswith(("/elements", "/reactions")):
-                 params['projectId'] = PROJECT_ID
+             # Removed automatic projectId addition for /elements and /reactions
+             # elif path.startswith(("/elements", "/reactions")):
+             #     params['projectId'] = PROJECT_ID
 
         response = self.request(method, path, params=params, **kwargs)
         response.raise_for_status()
@@ -75,16 +76,34 @@ class MinervaClient(httpx.Client):
         log.warning(f"Non-JSON response from {path}. Content-Type: {response.headers.get('content-type')}")
         return response.text
 
-    def get_all_elements(self) -> List[Dict[str, Any]]:
-        """Fetches all elements from the project map."""
-        elements_path = f"/projects/{PROJECT_ID}/models/{MAP_ID}/bioEntities/elements/"
+    def get_available_projects(self) -> List[Dict[str, Any]]:
+        """
+        Fetches a list of publicly visible projects from the Minerva API.
+        """
+        log.info("Fetching available projects from: /projects/")
+        projects_data = self._call_api("GET", "/projects/")
+        formatted_projects = []
+        if isinstance(projects_data, list):
+            for project in projects_data:
+                if isinstance(project, dict) and 'projectId' in project:
+                    project_name = project.get('name', project['projectId'])
+                    formatted_projects.append({'id': project['projectId'], 'name': project_name})
+                else:
+                    log.warning(f"Skipping unexpected project item format: {project}")
+        else:
+            log.warning(f"Received unexpected data format for projects list: {projects_data}")
+        return formatted_projects
+
+    def get_all_elements(self, project_id: str) -> List[Dict[str, Any]]:
+        """Fetches all elements from the specified project map."""
+        elements_path = f"/projects/{project_id}/models/{MAP_ID}/bioEntities/elements/"
         log.info(f"Fetching all elements from: {elements_path}")
         elements_data = self._call_api("GET", elements_path)
         return elements_data if isinstance(elements_data, list) else []
 
-    def get_all_reactions(self) -> List[Dict[str, Any]]:
-        """Fetches all reactions from the project map."""
-        reactions_path = f"/projects/{PROJECT_ID}/models/{MAP_ID}/bioEntities/reactions/"
+    def get_all_reactions(self, project_id: str) -> List[Dict[str, Any]]:
+        """Fetches all reactions from the specified project map."""
+        reactions_path = f"/projects/{project_id}/models/{MAP_ID}/bioEntities/reactions/"
         log.info(f"Fetching all reactions from: {reactions_path}")
         reactions_data = self._call_api("GET", reactions_path)
         return reactions_data if isinstance(reactions_data, list) else []
@@ -187,28 +206,30 @@ def format_reactions_for_llm(reactions_list: List[Dict[str, Any]], elements_df: 
     
     return "\n---\n".join(reaction_descriptions) # Join all reaction descriptions
 
-@tool("ontox_map_data_retriever")
-def ontox_map_data_retriever(question: Optional[str] = None) -> Dict[str, Any]: # Question is optional now
+@tool("minerva_map_data_retriever")
+def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID) -> Dict[str, Any]:
     """
-    Fetches all elements and reactions from the Ontox MINERVA project map
+    Fetches all elements and reactions from the specified MINERVA project map
     and formats them into a comprehensive text description including reaction references.
     This tool provides the full context of the map for LLM reasoning.
     
     Args:
         question: (Optional) The user's question, currently not used for filtering.
+        project_id: (Optional) The ID of the MINERVA project to fetch data from. Defaults to PROJECT_ID constant.
         
     Returns:
-        Dictionary with status ('success', 'error'),
+        Dictionary with status ('success', 'error', 'no_data_found'),
         data (formatted string of all reactions or None), and error_message (string or None).
     """
     try:
         client = MinervaClient()
-        log.info("Fetching all elements...")
-        all_elements = client.get_all_elements()
+        effective_project_id = project_id if project_id else PROJECT_ID
+        log.info(f"Fetching all elements for project ID: {effective_project_id}...")
+        all_elements = client.get_all_elements(project_id=effective_project_id)
         if not all_elements:
-            log.warning("No elements retrieved from the map.")
+            log.warning(f"No elements retrieved from the map for project ID: {effective_project_id}.")
             client.close()
-            return {"status": "no_data_found", "data": "No elements found in the map.", "error_message": None}
+            return {"status": "no_data_found", "data": f"No elements found in the map for project ID: {effective_project_id}.", "error_message": None}
         
         # Convert elements to DataFrame for efficient lookup
         elements_df = pd.DataFrame(all_elements)
@@ -218,12 +239,12 @@ def ontox_map_data_retriever(question: Optional[str] = None) -> Dict[str, Any]: 
              return {"status": "error", "data": None, "error_message": "Element data format error: missing 'id'."}
         elements_df['id'] = elements_df['id'].astype(int) # Ensure ID is integer for matching
 
-        log.info(f"Fetched {len(all_elements)} elements. Fetching all reactions...")
-        all_reactions = client.get_all_reactions()
+        log.info(f"Fetched {len(all_elements)} elements. Fetching all reactions for project ID: {effective_project_id}...")
+        all_reactions = client.get_all_reactions(project_id=effective_project_id)
         if not all_reactions:
-            log.warning("No reactions retrieved from the map.")
+            log.warning(f"No reactions retrieved from the map for project ID: {effective_project_id}.")
             client.close()
-            return {"status": "no_data_found", "data": "No reactions found in the map (though elements were found).", "error_message": None}
+            return {"status": "no_data_found", "data": f"No reactions found in the map for project ID: {effective_project_id} (though elements were found).", "error_message": None}
 
         log.info(f"Fetched {len(all_reactions)} reactions. Formatting for LLM...")
         formatted_data = format_reactions_for_llm(all_reactions, elements_df)
@@ -231,7 +252,7 @@ def ontox_map_data_retriever(question: Optional[str] = None) -> Dict[str, Any]: 
         
         return {"status": "success", "data": formatted_data, "error_message": None}
     except Exception as e:
-        log.exception(f"Critical error during Ontox map data retrieval for question: {question}")
+        log.exception(f"Critical error during Minerva map data retrieval for question: {question} and project ID: {project_id}")
         # Ensure client is closed even if error occurs after instantiation
         try:
             client.close()
@@ -240,12 +261,17 @@ def ontox_map_data_retriever(question: Optional[str] = None) -> Dict[str, Any]: 
         except Exception as close_e:
             log.error(f"Error closing MinervaClient after exception: {close_e}")
             
-        return {"status": "error", "data": None, "error_message": f"Failed to retrieve/process Ontox map data: {str(e)}"}
+        return {"status": "error", "data": None, "error_message": f"Failed to retrieve/process Minerva map data: {str(e)}"}
 
 if __name__ == "__main__":
-    print("--- Testing Ontox API Client (Full Map Data Retrieval with Reaction Refs) ---")
+    print("--- Testing Minerva API Client (Full Map Data Retrieval with Reaction Refs) ---")
     
-    result = ontox_map_data_retriever.invoke({}) 
+    # Example of how to invoke with a specific project ID for testing
+    # Replace 'your_test_project_id' with an actual project ID from the list
+    # result = minerva_map_data_retriever.invoke({"project_id": "Liver_Lipid_Metabolism_Physiological_Map_August_2024"})
+    
+    # Default invocation without specifying project_id (uses PROJECT_ID constant)
+    result = minerva_map_data_retriever.invoke({}) 
     
     print(f"\nStatus: {result['status']}")
     if result['status'] == 'success':

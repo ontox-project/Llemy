@@ -14,7 +14,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnableParallel, RunnablePassthrough
 
 # Import our custom tools
-from ontox_client import ontox_map_data_retriever
+from minerva_client import minerva_map_data_retriever
 from perplexity_client import perplexity_web
 
 # Load environment variables
@@ -27,17 +27,20 @@ llm = ChatOpenAI(
     api_key=os.environ.get("OPENAI_API_KEY", "")
 )
 
-def api_agent(question: str) -> Dict[str, str]:
+def api_agent(inputs: Dict[str, Any]) -> Dict[str, str]:
     """
-    Agent that queries the Ontox API for information.
+    Agent that queries the Minerva API for information.
     
     Args:
-        question: The user's question about lipid biology
+        inputs: Dictionary containing the user's question and selected project_id.
+                Expected keys: 'question', 'project_id'.
         
     Returns:
         Dictionary with API response status and data/error
     """
-    return ontox_map_data_retriever.invoke({}) # Call the new tool, question is optional for it
+    question = inputs.get("question")
+    project_id = inputs.get("project_id")
+    return minerva_map_data_retriever.invoke({"question": question, "project_id": project_id})
 
 def search_agent(question: str) -> Dict[str, Any]:
     """
@@ -62,10 +65,10 @@ parallel_retrieval = RunnableParallel(
 SYNTH_SYSTEM_PROMPT = """
 You are a senior toxicologist specializing in hepatic lipid metabolism.
 Your task is to synthesize information from two sources to answer the user's QUESTION:
-1.  **Ontox MINERVA Map Data**: This is a comprehensive dump of all reactions and elements from a specific metabolic map. It describes reactions, their participants (reactants, products, modifiers), and details about these elements (names, symbols, annotations). You will need to parse this information to find what's relevant to the QUESTION. Clearly label information derived from this source as "(Source: Ontox Map Data)". If the provided map data doesn't seem to contain information relevant to the QUESTION, state that. If there was an error retrieving this map data, that will be indicated.
+1.  **MINERVA Map Data**: This is a comprehensive dump of all reactions and elements from a specific metabolic map. It describes reactions, their participants (reactants, products, modifiers), and details about these elements (names, symbols, annotations). You will need to parse this information to find what's relevant to the QUESTION. Clearly label information derived from this source as "(Source: Minerva Map Data)". If the provided map data doesn't seem to contain information relevant to the QUESTION, state that. If there was an error retrieving this map data, that will be indicated.
 2.  **Perplexity Web Research**: Provides broader scientific context and citations from web searches. Clearly label information from this source as "(Source: Perplexity Web Research)" and include any provided citations. If there was an error or no data was found from Perplexity, state that.
 
-Based on the user's QUESTION, analyze both the detailed Ontox Map Data and the Perplexity Web Research.
+Based on the user's QUESTION, analyze both the detailed Minerva Map Data and the Perplexity Web Research.
 Create a comprehensive, scientifically rigorous answer.
 If the sources provide conflicting information, prioritize peer-reviewed research and explain the discrepancy, clearly stating which source supports which claim.
 Your answer should:
@@ -84,7 +87,7 @@ SYNTH_HUMAN_TEMPLATE = """
 USER QUESTION:
 {question}
 
-CONTEXT FROM ONTOX MINERVA MAP DATA:
+CONTEXT FROM MINERVA MAP DATA:
 Status: {api_status}
 Full Map Data (Reaction and Element Descriptions):
 {api_content}
@@ -96,7 +99,7 @@ Web Research Content:
 {web_content}
 Error (if any): {web_error}
 
-Please synthesize a comprehensive answer to the USER QUESTION based on the available data from both sources, clearly attributing information and noting any retrieval issues as instructed in the system prompt. Focus on finding information within the Ontox Map Data that is relevant to the USER QUESTION.
+Please synthesize a comprehensive answer to the USER QUESTION based on the available data from both sources, clearly attributing information and noting any retrieval issues as instructed in the system prompt. Focus on finding information within the Minerva Map Data that is relevant to the USER QUESTION.
 """
 
 # Create prompt template for synthesis
@@ -119,16 +122,16 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
         Dictionary with the final synthesized answer and the raw API results for UI display.
     """
     question = inputs["question"]
-    api_result = inputs.get("api_result", {"status": "error", "data": None, "error_message": "Ontox agent did not run."})
+    api_result = inputs.get("api_result", {"status": "error", "data": None, "error_message": "Minerva agent did not run."})
     web_result = inputs.get("web_result", {"status": "error", "data": None, "error_message": "Perplexity agent did not run."})
 
-    api_content = api_result.get("data", "No data available from Ontox API.")
-    if api_result.get("status") == "success" and not api_content.startswith("## Ontox API Results"):
-         api_content = f"## Ontox API Results\n\n{api_content}"
+    api_content = api_result.get("data", "No data available from Minerva API.")
+    if api_result.get("status") == "success" and not api_content.startswith("## Minerva API Results"):
+         api_content = f"## Minerva API Results\n\n{api_content}"
     elif api_result.get("status") == "error":
-        api_content = "Error retrieving data from Ontox API."
+        api_content = "Error retrieving data from Minerva API."
     elif api_result.get("status") == "no_data_found":
-        api_content = f"No specific data found in Ontox API: {api_result.get('data', '')}"
+        api_content = f"No specific data found in Minerva API: {api_result.get('data', '')}"
 
 
     web_content = web_result.get("data", "No data available from Perplexity Web Research.")
@@ -150,13 +153,13 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
     synthesis_result = response_chain.invoke(prompt_data)
     
     # Extract raw data only if successful
-    ontox_raw_data = api_result.get("data") if api_result.get("status") == "success" else None
+    minerva_raw_data = api_result.get("data") if api_result.get("status") == "success" else None
     
     return {
         "final_answer": synthesis_result.content,
         "api_status_details": api_result, # Pass through for UI
         "web_status_details": web_result,  # Pass through for UI
-        "ontox_raw_data": ontox_raw_data # Pass raw Ontox data if successful
+        "minerva_raw_data": minerva_raw_data # Pass raw Minerva data if successful
     }
 
 # Define the complete workflow
@@ -166,13 +169,14 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
 # 4. synth_agent_adapter formats this for the LLM and gets the final answer.
 workflow = (
     RunnablePassthrough.assign(
-        question=lambda x: x["question"] 
+        question=lambda x: x["question"],
+        project_id=lambda x: x.get("project_id") # Get project_id from input, default to None
     )
     | RunnablePassthrough.assign(
-        api_result=lambda x: api_agent(x["question"]),
+        api_result=lambda x: api_agent({"question": x["question"], "project_id": x.get("project_id")}),
         web_result=lambda x: search_agent(x["question"])
     )
-    | synth_agent_adapter 
+    | synth_agent_adapter
 )
 
 # Compile the workflow for use
@@ -184,9 +188,14 @@ if __name__ == "__main__":
     test_question = "What is the role of CD36 in fatty acid uptake?"
     print(f"Testing with question: {test_question}\n")
     
+    # Example invocation with a specific project_id for testing
+    # Replace 'Liver_Lipid_Metabolism_Physiological_Map_August_2024' with a project ID from the list
+    # result = assistant_chain.invoke({"question": test_question, "project_id": "Liver_Lipid_Metabolism_Physiological_Map_August_2024"})
+    
+    # Default invocation without specifying project_id
     result = assistant_chain.invoke({"question": test_question})
     
-    print("\n--- API Status (Ontox) ---")
+    print("\n--- API Status (Minerva) ---")
     print(f"Status: {result['api_status_details']['status']}")
     if result['api_status_details']['error_message']:
         print(f"Error: {result['api_status_details']['error_message']}")

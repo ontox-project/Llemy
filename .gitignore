@@ -131,3 +131,9 @@ dmypy.json
 .idea/
 *.swp
 *.swo
+
+# Temporary files and memory bank
+fatty-acid-assistant/feature-project-selection-plan.md
+fatty-acid-assistant/test_minerva_client_temp.py
+fatty-acid-assistant/test_minerva_maps_client.py
+memory-bank/

@@ -10,6 +10,7 @@ from workflow import assistant_chain
 from dotenv import load_dotenv
 import time
 import os
+from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID # Import MinervaClient and default project ID
 
 # Load environment variables
 load_dotenv()
@@ -17,8 +18,8 @@ load_dotenv()
 # Check if API keys are set
 def check_api_keys():
     missing_keys = []
-    if not os.environ.get("ONTOX_TOKEN"):
-        missing_keys.append("ONTOX_TOKEN")
+    if not os.environ.get("MINERVA_TOKEN"):
+        missing_keys.append("MINERVA_TOKEN")
     if not os.environ.get("PPLX_API_KEY"):
         missing_keys.append("PPLX_API_KEY")
     if not os.environ.get("OPENAI_API_KEY"):
@@ -77,11 +78,46 @@ with st.sidebar:
     This application helps researchers explore questions about lipid metabolism in the liver.
     
     It combines:
-    - Structured data from the Ontox MINERVA API
+    - Structured data from the MINERVA API
     - Web research from Perplexity
     - AI synthesis for comprehensive answers
     """)
     
+    st.markdown("---")
+    st.markdown("## MINERVA Project Selection")
+
+    # Fetch and display available projects
+    if "minerva_projects" not in st.session_state:
+        try:
+            client = MinervaClient()
+            st.session_state.minerva_projects = client.get_available_projects()
+            client.close() # Close the client after fetching
+        except Exception as e:
+            st.error(f"Failed to fetch MINERVA projects: {str(e)}")
+            st.session_state.minerva_projects = [] # Ensure it's a list even on error
+
+    if st.session_state.minerva_projects:
+        # Create a list of project names for the selectbox options
+        project_options = {p['name']: p['id'] for p in st.session_state.minerva_projects}
+        
+        # Find the index of the default project in the list of project IDs
+        default_index = 0
+        project_ids = list(project_options.values())
+        if DEFAULT_PROJECT_ID in project_ids:
+            default_index = project_ids.index(DEFAULT_PROJECT_ID)
+
+        selected_project_name = st.selectbox(
+            "Select MINERVA Project:",
+            options=list(project_options.keys()),
+            index=default_index, # Set default selection
+            key="selected_minerva_project_name"
+        )
+        # Store the selected project ID in session state
+        st.session_state.selected_minerva_project_id = project_options[selected_project_name]
+    elif "minerva_projects" in st.session_state and not st.session_state.minerva_projects:
+         st.warning("No MINERVA projects available or failed to load.")
+
+
     st.markdown("---")
     st.markdown("## Example Questions")
     
@@ -117,7 +153,7 @@ if missing_keys:
     1. Edit the `.env` file in the project directory
     2. Add your API keys in the format:
        ```
-       ONTOX_TOKEN=your_token_here
+       MINERVA_TOKEN=your_token_here
        PPLX_API_KEY=your_key_here
        OPENAI_API_KEY=your_key_here
        ```
@@ -139,9 +175,16 @@ def process_query(query):
     api_status_details = None
     web_status_details = None
     
-    with st.spinner("Retrieving knowledge from Ontox API and performing web research..."):
+    # Get the selected project ID from session state
+    selected_project_id = st.session_state.get("selected_minerva_project_id")
+    if not selected_project_id:
+        st.error("No MINERVA project selected.")
+        return "Error: No MINERVA project selected.", None, None
+
+    with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' and performing web research..."):
         try:
-            result = assistant_chain.invoke({"question": query})
+            # Pass the selected project_id to the assistant_chain
+            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id})
             answer = result.get("final_answer", "Error: No response generated.")
             api_status_details = result.get("api_status_details")
             web_status_details = result.get("web_status_details")
@@ -166,13 +209,13 @@ if st.session_state.query and not query:
 
 if query:
     # Add user query to history
-    st.session_state.history.append({"role": "user", "content": query, "api_status": None, "web_status": None, "ontox_data": None})
+    st.session_state.history.append({"role": "user", "content": query, "api_status": None, "web_status": None, "minerva_data": None})
     
     # Process the query
     answer, api_status, web_status = process_query(query)
     
-    # Extract Ontox raw data if available from the result
-    ontox_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
+    # Extract Minerva raw data if available from the result
+    minerva_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
 
     # Add assistant response to history
     st.session_state.history.append({
@@ -180,32 +223,32 @@ if query:
         "content": answer, 
         "api_status": api_status, 
         "web_status": web_status,
-        "ontox_data": ontox_data # Store the raw Ontox data
+        "minerva_data": minerva_data # Store the raw Minerva data
     })
 
 # Display chat history
 for message in st.session_state.history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        # Display Ontox raw data if available for assistant messages
-        if message["role"] == "assistant" and message.get("ontox_data"):
-             with st.expander("Ontox API Data Retrieved", expanded=False):
-                 st.text_area("Raw Data:", value=message["ontox_data"], height=200, disabled=True)
+        # Display Minerva raw data if available for assistant messages
+        if message["role"] == "assistant" and message.get("minerva_data"):
+             with st.expander("Minerva API Data Retrieved", expanded=False):
+                 st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True)
         
         # Display API Call Status
         if message["role"] == "assistant" and message.get("api_status"):
             with st.expander("API Call Status Details", expanded=False):
-                st.markdown("##### Ontox API")
-                ontox_status = message["api_status"]
-                if ontox_status["status"] == "success":
-                    st.success(f"Status: {ontox_status['status']}")
-                    # st.text_area("Data Snippet:", value=str(ontox_status.get('data', ''))[:200]+"...", height=100, disabled=True)
-                elif ontox_status["status"] == "no_data_found":
-                    st.warning(f"Status: {ontox_status['status']}")
-                    st.caption(f"Details: {ontox_status.get('data', 'No specific message.')}")
+                st.markdown("##### Minerva API")
+                minerva_status = message["api_status"]
+                if minerva_status["status"] == "success":
+                    st.success(f"Status: {minerva_status['status']}")
+                    # st.text_area("Data Snippet:", value=str(minerva_status.get('data', ''))[:200]+"...", height=100, disabled=True)
+                elif minerva_status["status"] == "no_data_found":
+                    st.warning(f"Status: {minerva_status['status']}")
+                    st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
                 else: # error
-                    st.error(f"Status: {ontox_status['status']}")
-                    st.caption(f"Error: {ontox_status.get('error_message', 'Unknown error')}")
+                    st.error(f"Status: {minerva_status['status']}")
+                    st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
 
                 st.markdown("##### Perplexity API")
                 perplexity_status = message["web_status"]
@@ -228,7 +271,7 @@ if not st.session_state.history:
     - Type your own question in the input box below
     - Try one of the example questions from the sidebar
     
-    The system will combine information from the Ontox MINERVA API and web research to provide comprehensive answers.
+    The system will combine information from the MINERVA API and web research to provide comprehensive answers.
     """)
 
 # Footer

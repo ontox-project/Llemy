@@ -1,12 +1,12 @@
 # Fatty Acid Assistant
 
-A multi-agent system for answering specialized questions about hepatic lipid biology by combining structured knowledge from the Ontox/MINERVA API with web research via Perplexity.
+A multi-agent system for answering specialized questions about hepatic lipid biology by combining structured knowledge from the MINERVA API with web research via Perplexity.
 
 ## Overview
 
 Fatty Acid Assistant is a prototype application that provides an intelligent interface for querying and retrieving information about liver lipid metabolism. It uses a three-agent workflow:
 
-1. **Ontox Agent**: Queries the MINERVA API for structured data about proteins, genes, and chemicals involved in lipid metabolism
+1. **Minerva Agent**: Queries the MINERVA API for structured data about proteins, genes, and chemicals involved in lipid metabolism
 2. **Perplexity Agent**: Performs deep web research using the Perplexity SONAR model
 3. **Synthesis Agent**: Combines information from both sources into comprehensive, scientifically rigorous answers
 
@@ -15,7 +15,7 @@ The system is designed to answer specialized questions about lipid transporters,
 ## Features
 
 - Natural language question answering about lipid biology
-- Integration with specialized Ontox MINERVA API for structured data
+- Integration with specialized MINERVA API for structured data
 - Web research using Perplexity for broader context
 - Parallel execution of data retrieval for faster responses
 - Chat-based Streamlit interface with example questions
@@ -26,7 +26,7 @@ The system is designed to answer specialized questions about lipid transporters,
 
 - Python 3.10 or higher
 - API keys for:
-  - Ontox MINERVA API
+  - MINERVA API (via MINERVA_TOKEN in .env)
   - Perplexity API
   - OpenAI API (for the synthesis agent)
 
@@ -52,7 +52,7 @@ The system is designed to answer specialized questions about lipid transporters,
 
 5. Create a `.env` file with your API keys:
    ```
-   ONTOX_TOKEN=your_ontox_token_here
+   MINERVA_TOKEN=your_minerva_token_here
    PPLX_API_KEY=your_perplexity_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here
    ```
@@ -91,7 +91,7 @@ fatty-acid-assistant/
 ├── .env                  # Environment variables (API keys)
 ├── requirements.txt      # Project dependencies
 ├── README.md             # This file
-├── ontox_client.py       # Ontox MINERVA API client
+├── minerva_client.py     # MINERVA API client
 ├── perplexity_client.py  # Perplexity API client
 ├── workflow.py           # LangChain agent workflow
 └── app.py                # Streamlit UI application
@@ -106,7 +106,7 @@ fatty-acid-assistant/
 
 ## Future Improvements
 
-- Adding more specialized data sources beyond Ontox
+- Adding more specialized data sources beyond Minerva
 - Implementing agent reflection for self-verification of responses
 - Adding vector storage for caching and more efficient similar question handling
 - Creating a function-calling version that allows for more structured API queries
@@ -119,7 +119,7 @@ This project is intended for research and educational purposes only.
 
 ## Acknowledgements
 
-- Ontox MINERVA API for providing structured data on liver lipid metabolism
+- MINERVA API (via ontox.elixir-luxembourg.org) for providing structured data on liver lipid metabolism
 - Perplexity for web research capabilities
 - LangChain for the agent orchestration framework
 - Streamlit for the user interface

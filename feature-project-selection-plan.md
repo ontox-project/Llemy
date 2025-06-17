@@ -2,11 +2,11 @@
 
 This document outlines the plan to add a feature allowing users to select different MINERVA projects within the Fatty Acid Assistant application.
 
-## Phase 1: Core Logic Modification (`ontox_client.py`)
+## Phase 1: Core Logic Modification (`minerva_client.py`)
 
 **Objective:** Enable the `MinervaClient` to list available MINERVA projects and fetch data for a user-selected project.
 
-**File:** `fatty-acid-assistant/ontox_client.py`
+**File:** `fatty-acid-assistant/minerva_client.py`
 
 **Steps:**
 
@@ -50,9 +50,9 @@ This document outlines the plan to add a feature allowing users to select differ
             -          params['projectId'] = PROJECT_ID
             ```
 
-2.  **Update the `@tool("ontox_map_data_retriever")` function:**
+2.  **Update the `@tool("minerva_map_data_retriever")` function:**
     *   Change signature to accept an optional `project_id`:
-        `def ontox_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID) -> Dict[str, Any]:`
+        `def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID) -> Dict[str, Any]:`
         (Uses the global `PROJECT_ID` as a default).
     *   Determine `effective_project_id`: `effective_project_id = project_id if project_id else PROJECT_ID`.
     *   Pass `effective_project_id` to `client.get_all_elements(project_id=effective_project_id)` and `client.get_all_reactions(project_id=effective_project_id)`.
@@ -66,7 +66,7 @@ This document outlines the plan to add a feature allowing users to select differ
 **Steps:**
 
 1.  **Modify `assistant_chain` (or relevant part of LCEL chain):**
-    *   When invoking the `ontox_map_data_retriever` tool, ensure the `project_id` selected by the user (passed from `app.py`) is correctly supplied to the tool.
+    *   When invoking the `minerva_map_data_retriever` tool, ensure the `project_id` selected by the user (passed from `app.py`) is correctly supplied to the tool.
     *   This might involve modifying how `RunnableParallel` or other LCEL components pass arguments. The `itemgetter` for `api_input` might need to be updated to include `project_id`.
 
 ## Phase 3: UI Implementation (`app.py`)
@@ -101,7 +101,7 @@ This document outlines the plan to add a feature allowing users to select differ
 
 1.  **Unit/Integration Tests (Conceptual):**
     *   Test `MinervaClient.get_available_projects()` against a mock API or live API if safe.
-    *   Test `ontox_map_data_retriever` with and without a `project_id` argument.
+    *   Test `minerva_map_data_retriever` with and without a `project_id` argument.
 2.  **End-to-End Testing:**
     *   Verify the project list is fetched and displayed correctly in the Streamlit UI.
     *   Test selecting different projects from the UI.
