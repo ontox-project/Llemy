@@ -1,26 +1,28 @@
-# Fatty Acid Assistant
+# LLMapperino
 
-A multi-agent system for answering specialized questions about hepatic lipid biology by combining structured knowledge from the MINERVA API with web research via Perplexity.
+A multi-agent system for answering specialized questions by combining structured knowledge from user-selected MINERVA API maps with web research via Perplexity.
 
 ## Overview
 
-Fatty Acid Assistant is a prototype application that provides an intelligent interface for querying and retrieving information about liver lipid metabolism. It uses a three-agent workflow:
+LLMapperino is a prototype application that provides an intelligent interface for querying and retrieving information from MINERVA project maps. It uses a three-agent workflow:
 
-1. **Minerva Agent**: Queries the MINERVA API for structured data about proteins, genes, and chemicals involved in lipid metabolism
-2. **Perplexity Agent**: Performs deep web research using the Perplexity SONAR model
-3. **Synthesis Agent**: Combines information from both sources into comprehensive, scientifically rigorous answers
+1. **Minerva Agent**: Fetches and processes the full map data from a user-selected MINERVA project.
+2. **Perplexity Agent**: Performs deep web research using the Perplexity SONAR model.
+3. **Synthesis Agent**: Combines information from both sources into comprehensive, scientifically rigorous answers.
 
-The system is designed to answer specialized questions about lipid transporters, nuclear receptors, and metabolic processes in the liver.
+The system is designed to answer specialized questions by reasoning over the context of the selected MINERVA map and relevant web research.
 
 ## Features
 
-- Natural language question answering about lipid biology
-- Integration with specialized MINERVA API for structured data
+- Natural language question answering
+- Integration with MINERVA API for structured map data
+- **User interface for selecting a MINERVA project to query.**
 - Web research using Perplexity for broader context
 - Parallel execution of data retrieval for faster responses
 - Chat-based Streamlit interface with example questions
 - Response time tracking
 - Error handling with automatic retries
+- **Displays detailed API call status and raw Minerva data for transparency.**
 
 ## Requirements
 
@@ -66,9 +68,10 @@ The system is designed to answer specialized questions about lipid transporters,
 
 2. The application will open in your web browser (typically at http://localhost:8501)
 
-3. Enter your question in the chat input, or select one of the example questions from the sidebar
+3. **Select a MINERVA project from the sidebar.**
+4. Enter your question in the chat input, or select one of the example questions from the sidebar.
 
-4. The system will process your question through the multi-agent workflow and display a comprehensive answer
+5. The system will process your question through the multi-agent workflow using the selected MINERVA project and display a comprehensive answer.
 
 ## Example Questions
 

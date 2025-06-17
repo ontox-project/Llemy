@@ -29,7 +29,7 @@ def check_api_keys():
 
 # Set up the Streamlit page
 st.set_page_config(
-    page_title="Steato-Hepatic Explorer",
+    page_title="LLMapperino",
     page_icon="🧪",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -66,8 +66,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Application header
-st.markdown("<h1 class='main-header'>Steato-Hepatic Explorer</h1>", unsafe_allow_html=True)
-st.markdown("<h3 class='sub-header'>A Multi-Agent System for Lipid Biology Research</h3>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-header'>LLMapperino</h1>", unsafe_allow_html=True)
+st.markdown("<h3 class='sub-header'>A Multi-Agent System for MINERVA Map Exploration</h3>", unsafe_allow_html=True)
 
 # Sidebar for settings and info
 with st.sidebar:
@@ -75,10 +75,10 @@ with st.sidebar:
     st.markdown("## About")
     
     st.markdown("""
-    This application helps researchers explore questions about lipid metabolism in the liver.
+    This application helps researchers explore questions about biological pathway maps available via the MINERVA API.
     
     It combines:
-    - Structured data from the MINERVA API
+    - Structured data from a user-selected MINERVA project map
     - Web research from Perplexity
     - AI synthesis for comprehensive answers
     """)
@@ -263,9 +263,9 @@ for message in st.session_state.history:
 # Display a getting started message if history is empty
 if not st.session_state.history:
     st.info("""
-    ## Welcome to the Steato-Hepatic Explorer!
+    ## Welcome to LLMapperino!
     
-    Ask questions about lipid biology and metabolism in the liver.
+    Ask questions about the selected MINERVA project map.
     
     You can:
     - Type your own question in the input box below
