@@ -196,7 +196,7 @@ This project is intended for research and educational purposes only.
 
 ## Acknowledgements
 
-- This project was a collaboration with Ontox and Elixir Europe.
+- This project was a collaboration with VHP4 Safety, Ontox and Elixir Europe.
 - MINERVA API (via ontox.elixir-luxembourg.org) for providing structured data on liver lipid metabolism
 - Perplexity for web research capabilities
 - LangChain for the agent orchestration framework
