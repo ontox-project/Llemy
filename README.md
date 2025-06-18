@@ -38,7 +38,7 @@ The system is designed to answer specialized questions by reasoning over the con
 
 2. Navigate to the project directory:
    ```bash
-   cd fatty-acid-assistant
+   cd LLMapperino
    ```
 
 3. Set up a virtual environment:
@@ -61,10 +61,30 @@ The system is designed to answer specialized questions by reasoning over the con
 
 ## Usage
 
+### Running Locally
+
 1. Start the Streamlit application:
    ```bash
    streamlit run app.py
    ```
+
+### Running with Docker
+
+1. Build the Docker image from the `LLMapperino/` directory:
+   ```bash
+   docker build -t llmapperino .
+   ```
+
+2. Run the Docker container, mapping the port and passing your API keys as environment variables:
+   ```bash
+   docker run -p 8501:8501 \
+     -e MINERVA_TOKEN="your_minerva_token_here" \
+     -e PPLX_API_KEY="your_perplexity_api_key_here" \
+     -e OPENAI_API_KEY="your_openai_api_key_here" \
+     llmapperino:latest
+   ```
+
+3. The application will open in your web browser (typically at http://localhost:8501)
 
 2. The application will open in your web browser (typically at http://localhost:8501)
 
@@ -90,10 +110,12 @@ The system is designed to answer specialized questions by reasoning over the con
 ## Project Structure
 
 ```
-fatty-acid-assistant/
+LLMapperino/
 ├── .env                  # Environment variables (API keys)
 ├── requirements.txt      # Project dependencies
 ├── README.md             # This file
+├── Dockerfile            # Docker build instructions
+├── .dockerignore         # Files to ignore when building Docker image
 ├── minerva_client.py     # MINERVA API client
 ├── perplexity_client.py  # Perplexity API client
 ├── workflow.py           # LangChain agent workflow
