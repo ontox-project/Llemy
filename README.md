@@ -12,6 +12,50 @@ LLMapperino is a prototype application that provides an intelligent interface fo
 
 The system is designed to answer specialized questions by reasoning over the context of the selected MINERVA map and relevant web research.
 
+## Workflow
+
+```mermaid
+graph TD
+    subgraph "User Interface (Streamlit)"
+        A[User Selects MINERVA Project] --> B;
+        B(User Asks Question) --> C{LLMapperino Workflow};
+    end
+
+    subgraph "Backend Workflow"
+        C --> D{1. Parallel Data Retrieval};
+        D --> E[Minerva Agent];
+        D --> F[Perplexity Agent];
+
+        E --> G["minerva_map_data_retriever(question, project_id)"];
+        G --> H["MINERVA API <br> (Fetch Full Map Data)"];
+        H --> I[Structured Map Context];
+
+        F --> J["perplexity_web(question)"];
+        J --> K["Perplexity API <br> (Web Research)"];
+        K --> L[Web Research Context];
+
+        I --> M{2. Synthesize Information};
+        L --> M;
+        C --> M
+
+        M --> N["Synthesis Agent <br> (GPT-4.1 as Toxicologist)"];
+        N --> O{3. Generate Comprehensive Answer};
+    end
+
+    subgraph "User Interface (Streamlit)"
+        O --> P[Display Final Answer];
+        I --> Q(Display Raw Minerva Data);
+        E --> R(Display Minerva API Status);
+        F --> S(Display Perplexity API Status);
+    end
+
+    style C fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
+    style N fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
+    style D fill:#A9CCE3,stroke:#000
+    style M fill:#A9CCE3,stroke:#000
+    style O fill:#A9CCE3,stroke:#000
+```
+
 ## Features
 
 - Natural language question answering

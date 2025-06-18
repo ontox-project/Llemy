@@ -137,3 +137,10 @@ fatty-acid-assistant/feature-project-selection-plan.md
 fatty-acid-assistant/test_minerva_client_temp.py
 fatty-acid-assistant/test_minerva_maps_client.py
 memory-bank/
+
+# Cline rules
+.clinerules
+
+# API documentation
+API documentation.md
+API endpoint.md
