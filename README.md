@@ -142,8 +142,17 @@ LLMapperino/
 
 This project is intended for research and educational purposes only.
 
+## Authors
+
+- Ivo Djidrovski (i.djidrovski@uu.nl)
+- Maia Ladeira Luiz Carlos
+- Marek OSTASZEWSKI
+- Marie Corradi
+- Bernard Staumont
+
 ## Acknowledgements
 
+- This project was a collaboration with Ontox and Elixir Europe.
 - MINERVA API (via ontox.elixir-luxembourg.org) for providing structured data on liver lipid metabolism
 - Perplexity for web research capabilities
 - LangChain for the agent orchestration framework
