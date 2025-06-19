@@ -22,7 +22,7 @@ graph TD
     end
 
     subgraph "Backend Workflow"
-        C --> D{1. Parallel Data Retrieval};
+        C --> D{1\. Parallel Data Retrieval};
         D --> E[Minerva Agent];
         D --> F[Perplexity Agent];
 
@@ -34,12 +34,12 @@ graph TD
         J --> K["Perplexity API <br> (Web Research)"];
         K --> L[Web Research Context];
 
-        I --> M{2. Synthesize Information};
+        I --> M{2\. Synthesize Information};
         L --> M;
         C --> M
 
         M --> N["Synthesis Agent <br> (GPT-4.1 as Toxicologist)"];
-        N --> O{3. Generate Comprehensive Answer};
+        N --> O{3\. Generate Comprehensive Answer};
     end
 
     subgraph "User Interface (Streamlit)"
