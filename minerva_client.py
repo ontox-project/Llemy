@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Ivo Djidrovski
+# Copyright 2025 Ivo Djidrovski - Marek Ostaszewski - Marie Corradi
 
 """
 MINERVA API Client (Refactored for Full Map Data Retrieval)
@@ -10,15 +10,16 @@ them into a descriptive text for LLM processing, including reaction references.
 Handles authentication via anonymous login with fallback to a pre-saved token.
 """
 
-import os
+#import os
 import httpx
 import tenacity
-import functools
+#import functools
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 from langchain.tools import tool
 import logging
-import pandas as pd # For easier element lookup
+import requests
+import pandas as pd
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -30,83 +31,69 @@ load_dotenv()
 # API Constants
 BASE_URL = "https://ontox.elixir-luxembourg.org/minerva/api"
 PROJECT_ID = "Liver_Lipid_Metabolism_Physiological_Map_August_2024"
-MAP_ID = "*" # Search across all maps in the project
+MAP_ID = "*" # Search across all maps in the chosen project
+
 
 class MinervaClient(httpx.Client):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, base_url=BASE_URL, follow_redirects=True, timeout=60, **kwargs) # Increased timeout
+    def __init__(self, base_url: str = BASE_URL, project_id: str = PROJECT_ID, *args, **kwargs):
+        self.base_url = base_url.rstrip("/")
+        self.project_id = project_id
+        super().__init__(*args, base_url=self.base_url, follow_redirects=True, timeout=60, **kwargs)
         self._authenticate()
 
     def _authenticate(self):
-        login_payload = f"login={os.getenv('ONTOX_USER', 'anonymous')}&password={os.getenv('ONTOX_PASS', '')}"
+        # enable only anonymous login for now
+        #TODO: fix anonymous connexion to MINERVA API
+        
+        login_payload = f"login=anonymous&password="
         login_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
         try:
-            response = self.post("/doLogin", content=login_payload.encode('utf-8'), headers=login_headers)
+            response = self.post("/doLogin", content=login_payload.encode("utf-8"), headers=login_headers)
             response.raise_for_status()
             log.info("MINERVA Client: Anonymous login successful.")
         except httpx.HTTPStatusError as e:
-            log.warning(f"MINERVA Client: Anonymous login failed ({e.response.status_code}). Attempting fallback to MINERVA_TOKEN.")
-            token = os.getenv("MINERVA_TOKEN")
-            if not token:
-                log.error("MINERVA Client: MINERVA_TOKEN not found. Authentication failed.")
-                raise ValueError("MINERVA authentication failed. Anonymous login rejected and no MINERVA_TOKEN provided.") from e
-            self.cookies.set("MINERVA_AUTH_TOKEN", token, domain="ontox.elixir-luxembourg.org")
-            log.info("MINERVA Client: Using pre-saved MINERVA_TOKEN.")
+            log.error(f"MINERVA Client: Anonymous login failed ({e.response.status_code}).")
+            raise ValueError("MINERVA authentication failed. Anonymous login rejected.") from e
         except Exception as e:
             log.error(f"MINERVA Client: Unexpected error during authentication: {str(e)}")
             raise
 
     @tenacity.retry(
-        wait=tenacity.wait_random_exponential(min=2, max=30), # Increased min wait
+        wait=tenacity.wait_random_exponential(min=2, max=30),
         stop=tenacity.stop_after_attempt(3),
         retry=tenacity.retry_if_exception_type((httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException)),
         reraise=True
     )
     def _call_api(self, method: str, path: str, **kwargs) -> Any:
         log.debug(f"Calling MINERVA API: {method} {path} with params {kwargs.get('params')}")
-        params = kwargs.pop('params', {})
-        if 'projectId' not in path and 'projectId' not in params:
-             if path.startswith(("/projects/", "/models/", "/bioEntities/")) or "/models/" in path :
-                 pass
-             # Removed automatic projectId addition for /elements and /reactions
-             # elif path.startswith(("/elements", "/reactions")):
-             #     params['projectId'] = PROJECT_ID
+        params = kwargs.pop("params", {})
+
+        # Optionally inject project ID
+        if self.project_id and 'projectId' not in path and 'projectId' not in params:
+            if path.startswith(("/projects/", "/models/", "/bioEntities/")) or "/models/" in path:
+                pass  # Do not auto-inject
+            elif path.startswith(("/elements", "/reactions")):
+                params["projectId"] = self.project_id
 
         response = self.request(method, path, params=params, **kwargs)
         response.raise_for_status()
-        if 'application/json' in response.headers.get('content-type', ''):
+
+        if "application/json" in response.headers.get("content-type", ""):
             return response.json()
         log.warning(f"Non-JSON response from {path}. Content-Type: {response.headers.get('content-type')}")
         return response.text
 
-    def get_available_projects(self) -> List[Dict[str, Any]]:
-        """
-        Fetches a list of publicly visible projects from the Minerva API.
-        """
-        log.info("Fetching available projects from: /projects/")
-        projects_data = self._call_api("GET", "/projects/")
-        formatted_projects = []
-        if isinstance(projects_data, list):
-            for project in projects_data:
-                if isinstance(project, dict) and 'projectId' in project:
-                    project_name = project.get('name', project['projectId'])
-                    formatted_projects.append({'id': project['projectId'], 'name': project_name})
-                else:
-                    log.warning(f"Skipping unexpected project item format: {project}")
-        else:
-            log.warning(f"Received unexpected data format for projects list: {projects_data}")
-        return formatted_projects
-
-    def get_all_elements(self, project_id: str) -> List[Dict[str, Any]]:
+    def get_all_elements(self) -> List[Dict[str, Any]]:
         """Fetches all elements from the specified project map."""
-        elements_path = f"/projects/{project_id}/models/{MAP_ID}/bioEntities/elements/"
+        elements_path = f"/projects/{self.project_id}/models/{MAP_ID}/bioEntities/elements/"
         log.info(f"Fetching all elements from: {elements_path}")
         elements_data = self._call_api("GET", elements_path)
         return elements_data if isinstance(elements_data, list) else []
 
-    def get_all_reactions(self, project_id: str) -> List[Dict[str, Any]]:
+    def get_all_reactions(self) -> List[Dict[str, Any]]:
         """Fetches all reactions from the specified project map."""
-        reactions_path = f"/projects/{project_id}/models/{MAP_ID}/bioEntities/reactions/"
+        reactions_path = f"/projects/{self.project_id}/models/{MAP_ID}/bioEntities/reactions/"
         log.info(f"Fetching all reactions from: {reactions_path}")
         reactions_data = self._call_api("GET", reactions_path)
         return reactions_data if isinstance(reactions_data, list) else []
@@ -210,7 +197,7 @@ def format_reactions_for_llm(reactions_list: List[Dict[str, Any]], elements_df: 
     return "\n---\n".join(reaction_descriptions) # Join all reaction descriptions
 
 @tool("minerva_map_data_retriever")
-def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID) -> Dict[str, Any]:
+def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID, machine_url: Optional[str] = BASE_URL) -> Dict[str, Any]:
     """
     Fetches all elements and reactions from the specified MINERVA project map
     and formats them into a comprehensive text description including reaction references.
@@ -225,10 +212,10 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
         data (formatted string of all reactions or None), and error_message (string or None).
     """
     try:
-        client = MinervaClient()
-        effective_project_id = project_id if project_id else PROJECT_ID
+        client = MinervaClient(base_url=machine_url, project_id=project_id)
+        effective_project_id = client.project_id if project_id else PROJECT_ID
         log.info(f"Fetching all elements for project ID: {effective_project_id}...")
-        all_elements = client.get_all_elements(project_id=effective_project_id)
+        all_elements = client.get_all_elements()
         if not all_elements:
             log.warning(f"No elements retrieved from the map for project ID: {effective_project_id}.")
             client.close()
@@ -243,7 +230,7 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
         elements_df['id'] = elements_df['id'].astype(int) # Ensure ID is integer for matching
 
         log.info(f"Fetched {len(all_elements)} elements. Fetching all reactions for project ID: {effective_project_id}...")
-        all_reactions = client.get_all_reactions(project_id=effective_project_id)
+        all_reactions = client.get_all_reactions()
         if not all_reactions:
             log.warning(f"No reactions retrieved from the map for project ID: {effective_project_id}.")
             client.close()
@@ -255,7 +242,7 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
         
         return {"status": "success", "data": formatted_data, "error_message": None}
     except Exception as e:
-        log.exception(f"Critical error during Minerva map data retrieval for question: {question} and project ID: {project_id}")
+        log.exception(f"Critical error during Minerva map data retrieval")
         # Ensure client is closed even if error occurs after instantiation
         try:
             client.close()

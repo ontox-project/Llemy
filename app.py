@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 import time
 import os
 from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID # Import MinervaClient and default project ID
+from minerva_utils import get_available_projects 
 
 # Load environment variables
 load_dotenv()
@@ -21,8 +22,8 @@ load_dotenv()
 # Check if API keys are set
 def check_api_keys():
     missing_keys = []
-    if not os.environ.get("MINERVA_TOKEN"):
-        missing_keys.append("MINERVA_TOKEN")
+    #if not os.environ.get("MINERVA_TOKEN"):
+    #    missing_keys.append("MINERVA_TOKEN")
     if not os.environ.get("PPLX_API_KEY"):
         missing_keys.append("PPLX_API_KEY")
     if not os.environ.get("OPENAI_API_KEY"):
@@ -89,38 +90,41 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## MINERVA Project Selection")
 
-    # Fetch and display available projects
+    # Fetch and cache available projects
     if "minerva_projects" not in st.session_state:
         try:
-            client = MinervaClient()
-            st.session_state.minerva_projects = client.get_available_projects()
-            client.close() # Close the client after fetching
+            st.session_state.minerva_projects = get_available_projects()
         except Exception as e:
             st.error(f"Failed to fetch MINERVA projects: {str(e)}")
-            st.session_state.minerva_projects = [] # Ensure it's a list even on error
+            st.session_state.minerva_projects = []
 
+    # UI: project selection
     if st.session_state.minerva_projects:
-        # Create a list of project names for the selectbox options
-        project_options = {p['name']: p['id'] for p in st.session_state.minerva_projects}
-        
-        # Find the index of the default project in the list of project IDs
+        project_options = [p['project'] for p in st.session_state.minerva_projects]
+
+        # Default selection logic
         default_index = 0
-        project_ids = list(project_options.values())
-        if DEFAULT_PROJECT_ID in project_ids:
-            default_index = project_ids.index(DEFAULT_PROJECT_ID)
+        if DEFAULT_PROJECT_ID in project_options:
+            default_index = project_options.index(DEFAULT_PROJECT_ID)
 
         selected_project_name = st.selectbox(
             "Select MINERVA Project:",
-            options=list(project_options.keys()),
-            index=default_index, # Set default selection
+            options=project_options,
+            index=default_index,
             key="selected_minerva_project_name"
         )
-        # Store the selected project ID in session state
-        st.session_state.selected_minerva_project_id = project_options[selected_project_name]
-    elif "minerva_projects" in st.session_state and not st.session_state.minerva_projects:
-         st.warning("No MINERVA projects available or failed to load.")
+
+        st.session_state.selected_minerva_project_id = selected_project_name
+        st.session_state.selected_machine_url = next((p["machine_url"] for p in st.session_state.minerva_projects if p["project"] == selected_project_name), None)
+
+    elif "minerva_projects" in st.session_state:
+        st.warning("No MINERVA projects available or failed to load.")
 
 
+    @st.cache_resource
+    def get_minerva_client(base_url: str) -> MinervaClient:
+        return MinervaClient(base_url=base_url)
+    
     st.markdown("---")
     st.markdown("## Example Questions")
     
@@ -183,11 +187,16 @@ def process_query(query):
     if not selected_project_id:
         st.error("No MINERVA project selected.")
         return "Error: No MINERVA project selected.", None, None
+    # Get the smachine url from session state
+    selected_machine_url = st.session_state.get("selected_machine_url")
+    if not selected_machine_url:
+        st.error("No machine URL associated to project.")
+        return "Error: No machine URL associated to project.", None, None
 
     with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' and performing web research..."):
         try:
             # Pass the selected project_id to the assistant_chain
-            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id})
+            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url})
             answer = result.get("final_answer", "Error: No response generated.")
             api_status_details = result.get("api_status_details")
             web_status_details = result.get("web_status_details")

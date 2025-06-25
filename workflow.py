@@ -2,6 +2,7 @@
 # Copyright 2025 Ivo Djidrovski
 
 """
+#TODO: more general description
 Workflow Module for Fatty Acid Assistant
 
 This module defines the LangChain workflow that orchestrates the multi-agent system
@@ -18,6 +19,7 @@ from langchain.schema.runnable import RunnableParallel, RunnablePassthrough
 
 # Import our custom tools
 from minerva_client import minerva_map_data_retriever
+from minerva_utils import get_available_projects
 from perplexity_client import perplexity_web
 
 # Load environment variables
@@ -25,8 +27,8 @@ load_dotenv()
 
 # Initialize the LLM for synthesis
 llm = ChatOpenAI(
-    model_name="gpt-4.1",  # Updated to gpt-4.1 as requested
-    temperature=0.0,  # Low temperature for more factual responses
+    model_name="gpt-4.1",  
+    temperature=0.0,  
     api_key=os.environ.get("OPENAI_API_KEY", "")
 )
 
@@ -36,14 +38,15 @@ def api_agent(inputs: Dict[str, Any]) -> Dict[str, str]:
     
     Args:
         inputs: Dictionary containing the user's question and selected project_id.
-                Expected keys: 'question', 'project_id'.
+                Expected keys: 'question', 'project_id', machine_url.
         
     Returns:
         Dictionary with API response status and data/error
     """
     question = inputs.get("question")
     project_id = inputs.get("project_id")
-    return minerva_map_data_retriever.invoke({"question": question, "project_id": project_id})
+    machine_url = inputs.get("machine_url")
+    return minerva_map_data_retriever.invoke({"question": question, "project_id": project_id, "machine_url": machine_url})
 
 def search_agent(question: str) -> Dict[str, Any]:
     """
@@ -65,6 +68,7 @@ parallel_retrieval = RunnableParallel(
 )
 
 # System prompt for the synthesis agent
+#TODO: make prompt more general
 SYNTH_SYSTEM_PROMPT = """
 You are a senior toxicologist specializing in hepatic lipid metabolism.
 Your task is to synthesize information from two sources to answer the user's QUESTION:
@@ -172,11 +176,12 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
 # 4. synth_agent_adapter formats this for the LLM and gets the final answer.
 workflow = (
     RunnablePassthrough.assign(
-        question=lambda x: x["question"],
-        project_id=lambda x: x.get("project_id") # Get project_id from input, default to None
+        question=lambda x: x.get("question"),
+        project_id=lambda x: x.get("project_id"),
+        machine_url=lambda x: x.get("machine_url") 
     )
     | RunnablePassthrough.assign(
-        api_result=lambda x: api_agent({"question": x["question"], "project_id": x.get("project_id")}),
+        api_result=lambda x: api_agent({"question": x.get("question"), "project_id": x.get("project_id"), "machine_url":x.get("machine_url")}),
         web_result=lambda x: search_agent(x["question"])
     )
     | synth_agent_adapter
