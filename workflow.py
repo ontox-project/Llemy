@@ -27,7 +27,7 @@ load_dotenv()
 
 # Initialize the LLM for synthesis
 llm = ChatOpenAI(
-    model_name="gpt-4.1",  
+    model_name="gpt-4.1-mini",  #changed for increased context, but still limited for some maps
     temperature=0.0,  
     api_key=os.environ.get("OPENAI_API_KEY", "")
 )

@@ -29,42 +29,41 @@ log = logging.getLogger(__name__)
 load_dotenv()
 
 # API Constants
-BASE_URL = "https://ontox.elixir-luxembourg.org/minerva/api"
+BASE_URL = "https://ontox.elixir-luxembourg.org/minerva/"
 PROJECT_ID = "Liver_Lipid_Metabolism_Physiological_Map_August_2024"
 MAP_ID = "*" # Search across all maps in the chosen project
 
 
 class MinervaClient(httpx.Client):
     def __init__(self, base_url: str = BASE_URL, project_id: str = PROJECT_ID, *args, **kwargs):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = base_url.rstrip("/")+ "/api"
         self.project_id = project_id
         super().__init__(*args, base_url=self.base_url, follow_redirects=True, timeout=60, **kwargs)
-        self._authenticate()
+        #self._authenticate()
 
-    def _authenticate(self):
-        # enable only anonymous login for now
-        #TODO: fix anonymous connexion to MINERVA API
-        
-        login_payload = f"login=anonymous&password="
-        login_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    #def _authenticate(self):
+    #    # enot needed for anonymous login
+    #   
+    #    login_payload = f"login=anonymous&password="
+    #    login_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-        try:
-            response = self.post("/doLogin", content=login_payload.encode("utf-8"), headers=login_headers)
-            response.raise_for_status()
-            log.info("MINERVA Client: Anonymous login successful.")
-        except httpx.HTTPStatusError as e:
-            log.error(f"MINERVA Client: Anonymous login failed ({e.response.status_code}).")
-            raise ValueError("MINERVA authentication failed. Anonymous login rejected.") from e
-        except Exception as e:
-            log.error(f"MINERVA Client: Unexpected error during authentication: {str(e)}")
-            raise
+    #    try:
+    #        response = self.post("/doLogin", content=login_payload.encode("utf-8"), headers=login_headers)
+    #        response.raise_for_status()
+    #        log.info("MINERVA Client: Anonymous login successful.")
+    #    except httpx.HTTPStatusError as e:
+    #        log.error(f"MINERVA Client: Anonymous login failed ({e.response.status_code}).")
+    #        raise ValueError("MINERVA authentication failed. Anonymous login rejected.") from e
+    #    except Exception as e:
+    #        log.error(f"MINERVA Client: Unexpected error during authentication: {str(e)}")
+    #        raise
 
-    @tenacity.retry(
-        wait=tenacity.wait_random_exponential(min=2, max=30),
-        stop=tenacity.stop_after_attempt(3),
-        retry=tenacity.retry_if_exception_type((httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException)),
-        reraise=True
-    )
+    #@tenacity.retry(
+    #    wait=tenacity.wait_random_exponential(min=2, max=30),
+    #    stop=tenacity.stop_after_attempt(3),
+    #    retry=tenacity.retry_if_exception_type((httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException)),
+    #    reraise=True
+    #)
     def _call_api(self, method: str, path: str, **kwargs) -> Any:
         log.debug(f"Calling MINERVA API: {method} {path} with params {kwargs.get('params')}")
         params = kwargs.pop("params", {})
@@ -210,6 +209,7 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
     Returns:
         Dictionary with status ('success', 'error', 'no_data_found'),
         data (formatted string of all reactions or None), and error_message (string or None).
+    #TODO: add filter based on query to limit context passed to synthesizer
     """
     try:
         client = MinervaClient(base_url=machine_url, project_id=project_id)

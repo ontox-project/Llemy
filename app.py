@@ -212,7 +212,7 @@ def process_query(query):
     return answer, api_status_details, web_status_details
 
 # Main chat interface
-query = st.chat_input("Ask about lipid biology, transporters, or metabolism...", key="chat_input")
+query = st.chat_input("Ask about biology, transporters, or metabolism...", key="chat_input")
 
 # Process query from session state (if set by example button)
 if st.session_state.query and not query:
