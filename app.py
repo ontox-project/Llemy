@@ -9,27 +9,43 @@ allowing users to ask questions about lipid biology and view comprehensive answe
 """
 
 import streamlit as st
-from workflow import assistant_chain
-from dotenv import load_dotenv
 import time
 import os
-from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID # Import MinervaClient and default project ID
-from minerva_utils import get_available_projects 
+
 
 # Load environment variables
-load_dotenv()
+#load_dotenv()
 
-# Check if API keys are set
-def check_api_keys():
-    missing_keys = []
-    #if not os.environ.get("MINERVA_TOKEN"):
-    #    missing_keys.append("MINERVA_TOKEN")
-    if not os.environ.get("PPLX_API_KEY"):
-        missing_keys.append("PPLX_API_KEY")
-    if not os.environ.get("OPENAI_API_KEY"):
-        missing_keys.append("OPENAI_API_KEY")
-    
-    return missing_keys
+
+st.title("🔐 API Keys Login")
+
+# Get API key from user
+api_key_oai = st.text_input("Enter your OpenAI API key", type="password")
+api_key_pplx = st.text_input("Enter your Perplexity API key", type="password")
+
+if api_key_oai:
+    st.session_state.api_key_oai = api_key_oai
+    os.environ["OPENAI_API_KEY"] = api_key_oai  
+    st.success("Open AI API key set")
+
+else:
+    st.warning("Please enter your Open AI API key to continue.")
+    st.stop()
+
+if api_key_pplx:
+    st.session_state.api_key_pplx = api_key_pplx
+    os.environ["PPLX_API_KEY"] = api_key_pplx 
+    st.success("Perplexity API key set")
+
+else:
+    st.warning("Please enter your Perplexity API key to continue.")
+    st.stop()
+
+
+# Lazy import to avoid api key issues
+from workflow import assistant_chain
+from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID
+from minerva_utils import get_available_projects 
 
 # Set up the Streamlit page
 st.set_page_config(
@@ -151,22 +167,6 @@ with st.sidebar:
     if "response_time" in st.session_state:
         st.metric("Last Response Time", f"{st.session_state.response_time:.2f}s")
 
-# Check for missing API keys
-missing_keys = check_api_keys()
-if missing_keys:
-    st.error(f"Missing API key(s): {', '.join(missing_keys)}. Please add them to your .env file.")
-    st.info("""
-    To set up your API keys:
-    1. Edit the `.env` file in the project directory
-    2. Add your API keys in the format:
-       ```
-       MINERVA_TOKEN=your_token_here
-       PPLX_API_KEY=your_key_here
-       OPENAI_API_KEY=your_key_here
-       ```
-    3. Restart the application
-    """)
-    st.stop()
 
 # Initialize session state for chat history
 if "history" not in st.session_state:

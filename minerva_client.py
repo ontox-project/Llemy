@@ -189,7 +189,7 @@ def format_reactions_for_llm(reactions_list: List[Dict[str, Any]], elements_df: 
             # Use " and " as separator like R code's paste(collapse = " and ") might imply
             ref_text = " and ".join(reaction_ref_strings)
             # Use slightly different phrasing for clarity and to ensure it's appended
-            lines.append(f"  (Supported by references: {ref_text})") 
+            lines.append(f"  (References: {ref_text})") 
             
         reaction_descriptions.append("\n".join(lines)) # Join lines for this reaction description
     

@@ -23,7 +23,7 @@ from minerva_utils import get_available_projects
 from perplexity_client import perplexity_web
 
 # Load environment variables
-load_dotenv()
+#load_dotenv()
 
 # Initialize the LLM for synthesis
 llm = ChatOpenAI(
