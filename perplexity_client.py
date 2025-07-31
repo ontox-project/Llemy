@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Ivo Djidrovski
+# Copyright 2025 Ivo Djidrovski, Marie Corradi
 
 """
 Perplexity SONAR API Client
@@ -8,19 +8,16 @@ This module provides a client for interacting with the Perplexity API,
 specifically focused on performing web research for lipid biology questions.
 """
 
-import os
 import httpx
 import tenacity
 from typing import Dict, Any
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from langchain.tools import tool
+from config import get_perplexity_api_key
 
-# Load environment variables from .env file
-load_dotenv()
 
 # API Constants
 API_URL = "https://api.perplexity.ai/chat/completions"
-API_KEY = os.environ.get("PPLX_API_KEY", "")
 
 @tenacity.retry(
     wait=tenacity.wait_random_exponential(min=1, max=20),
@@ -52,7 +49,7 @@ def pplx_call(prompt: str, model="sonar-pro", temperature=0.2) -> str:
     }
     
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {get_perplexity_api_key()}",
         "Content-Type": "application/json"
     }
     
@@ -137,6 +134,5 @@ def perplexity_web(question: str) -> str:
 
 if __name__ == "__main__":
     # Example usage
-    # Ensure your .env file has PPLX_API_KEY
     result = perplexity_web("What is the role of CD36 in fatty acid uptake?")
     print(result)

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Ivo Djidrovski
+# Copyright 2025 Ivo Djidrovski, Marie Corradi
 
 """
 #TODO: more general description
@@ -9,9 +9,8 @@ This module defines the LangChain workflow that orchestrates the multi-agent sys
 for answering lipid biology questions using the Ontox API and Perplexity web research.
 """
 
-import os
 from typing import Dict, Any
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage
 from langchain.prompts import ChatPromptTemplate
@@ -21,16 +20,14 @@ from langchain.schema.runnable import RunnableParallel, RunnablePassthrough
 from minerva_client import minerva_map_data_retriever
 from minerva_utils import get_available_projects
 from perplexity_client import perplexity_web
+from config import get_openai_api_key
 
-# Load environment variables
-#load_dotenv()
 
-# Initialize the LLM for synthesis
-llm = ChatOpenAI(
-    model_name="gpt-4.1-mini",  #changed for increased context, but still limited for some maps
-    temperature=0.0,  
-    api_key=os.environ.get("OPENAI_API_KEY", "")
-)
+model_name="gpt-4.1-mini" #changed for increased context, but still limited for some maps
+
+
+def get_llm():
+    return ChatOpenAI(model_name=model_name, temperature=0.0, api_key=get_openai_api_key())
 
 def api_agent(inputs: Dict[str, Any]) -> Dict[str, str]:
     """
@@ -156,6 +153,7 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
     }
     
     # Generate the synthesis
+    llm = get_llm()
     response_chain = synth_prompt | llm
     synthesis_result = response_chain.invoke(prompt_data)
     

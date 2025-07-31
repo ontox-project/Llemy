@@ -25,8 +25,6 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# Load environment variables from .env file
-load_dotenv()
 
 # API Constants
 BASE_URL = "https://ontox.elixir-luxembourg.org/minerva/"

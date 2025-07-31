@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Ivo Djidrovski
+# Copyright 2025 Ivo Djidrovski, Marie Corradi
 
 """
 Streamlit UI for Fatty Acid Assistant
@@ -9,37 +9,72 @@ allowing users to ask questions about lipid biology and view comprehensive answe
 """
 
 import streamlit as st
+from datetime import datetime, timedelta
 import time
-import os
 
+# --- Constants
+EXPIRATION_MINUTES = 20
+EXPIRATION_DELTA = timedelta(minutes=EXPIRATION_MINUTES)
 
-# Load environment variables
-#load_dotenv()
+# --- Utility: Expiration check
+def is_key_expired(timestamp):
+    return not timestamp or (datetime.now() - timestamp > EXPIRATION_DELTA)
 
+# --- Utility: Logout
+def clear_keys():
+    for key in ["api_key_oai", "api_key_oai_time", "api_key_pplx", "api_key_pplx_time"]:
+        st.session_state.pop(key, None)
+    st.success("🔓 Logged out successfully!")
 
-st.title("🔐 API Keys Login")
+# --- UI Layout: Title and logout button in one row
+col1, col2 = st.columns([12, 1])
+with col1:
+    st.title("🔐 API Keys Login")
+with col2:
+    if st.button("Logout"):
+        clear_keys()
+        st.rerun()
 
-# Get API key from user
-api_key_oai = st.text_input("Enter your OpenAI API key", type="password")
-api_key_pplx = st.text_input("Enter your Perplexity API key", type="password")
+# --- Initialize missing session keys
+for key in ["api_key_oai", "api_key_oai_time", "api_key_pplx", "api_key_pplx_time"]:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
-if api_key_oai:
-    st.session_state.api_key_oai = api_key_oai
-    os.environ["OPENAI_API_KEY"] = api_key_oai  
-    st.success("Open AI API key set")
+# --- Expire if keys too old
+if is_key_expired(st.session_state.api_key_oai_time):
+    st.session_state.api_key_oai = None
+    st.session_state.api_key_oai_time = None
 
+if is_key_expired(st.session_state.api_key_pplx_time):
+    st.session_state.api_key_pplx = None
+    st.session_state.api_key_pplx_time = None
+
+# --- Prompt for OpenAI key if needed
+if not st.session_state.api_key_oai:
+    api_key_oai = st.text_input("Enter your OpenAI API key", type="password")
+    if api_key_oai:
+        st.session_state.api_key_oai = api_key_oai
+        st.session_state.api_key_oai_time = datetime.now()
+        st.success("✅ OpenAI API key set")
+    else:
+        st.warning("Please enter your OpenAI API key to continue.")
+        st.stop()
 else:
-    st.warning("Please enter your Open AI API key to continue.")
-    st.stop()
+    st.success("✅ OpenAI API key is already set")
 
-if api_key_pplx:
-    st.session_state.api_key_pplx = api_key_pplx
-    os.environ["PPLX_API_KEY"] = api_key_pplx 
-    st.success("Perplexity API key set")
-
+# --- Prompt for Perplexity key if needed
+if not st.session_state.api_key_pplx:
+    api_key_pplx = st.text_input("Enter your Perplexity API key", type="password")
+    if api_key_pplx:
+        st.session_state.api_key_pplx = api_key_pplx
+        st.session_state.api_key_pplx_time = datetime.now()
+        st.success("✅ Perplexity API key set")
+    else:
+        st.warning("Please enter your Perplexity API key to continue.")
+        st.stop()
 else:
-    st.warning("Please enter your Perplexity API key to continue.")
-    st.stop()
+    st.success("✅ Perplexity API key is already set")
+
 
 
 # Lazy import to avoid api key issues
@@ -290,7 +325,7 @@ if not st.session_state.history:
 st.markdown("---")
 st.markdown("""
 *This is a prototype application for research purposes only.  
-Developed with Streamlit, LangChain, and Perplexity.*
+Developed with Streamlit, LangChain, OpenAI and Perplexity.*
 """)
 
 if __name__ == "__main__":
