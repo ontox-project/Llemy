@@ -78,7 +78,7 @@ else:
 
 
 # Lazy import to avoid api key issues
-from workflow import assistant_chain
+from workflow import assistant_chain, MODEL_NAME
 from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID
 from minerva_utils import get_available_projects 
 
@@ -323,10 +323,10 @@ if not st.session_state.history:
 
 # Footer
 st.markdown("---")
-st.markdown("""
-*This is a prototype application for research purposes only.  
-Developed with Streamlit, LangChain, OpenAI and Perplexity.*
-""")
+
+st.markdown(f"""
+<small>This is a prototype application for research purposes only.  
+Developped with Streamlit, LangChain, OpenAI ({MODEL_NAME}) and Perplexity. License Apache 2.0.</small>""", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     # This will only execute when the script is run directly

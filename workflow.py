@@ -23,8 +23,8 @@ from perplexity_client import perplexity_web
 from config import get_openai_api_key
 
 
-model_name="gpt-4.1-mini" #changed for increased context, but still limited for some maps
-
+MODEL_NAME="gpt-4.1-mini" #changed for increased context, but still limited for some maps
+model_name=MODEL_NAME
 
 def get_llm():
     return ChatOpenAI(model_name=model_name, temperature=0.0, api_key=get_openai_api_key())
