@@ -192,10 +192,21 @@ with st.sidebar:
         "What is the abundance of FATP transporters in the liver?",
         "Is valproic acid inhibitor of OTG2?"
     ]
+
+    def set_prompt(example_text):
+        st.session_state.query = example_text
+
+    def shorten_text(text, max_chars=50):
+        return text if len(text) <= max_chars else text[:max_chars-3] + "..."
     
     for q in example_questions:
-        if st.button(q[:50] + "..." if len(q) > 50 else q):
-            st.session_state.query = q
+        st.button(
+            label=shorten_text(q),
+            help=q, 
+            on_click=set_prompt,
+            args=(q,)
+        )
+
     
     st.markdown("---")
     st.markdown("### Performance Metrics")
