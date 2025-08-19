@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Marie Corradi
+
 import streamlit as st
 
 def get_openai_api_key():

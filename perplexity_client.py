@@ -5,7 +5,7 @@
 Perplexity SONAR API Client
 
 This module provides a client for interacting with the Perplexity API,
-specifically focused on performing web research for lipid biology questions.
+specifically focused on performing web research for physiological maps questions.
 """
 
 import httpx
@@ -109,11 +109,11 @@ def enhance_query(question: str) -> str:
 @tool("perplexity_web", return_direct=True)
 def perplexity_web(question: str) -> str:
     """
-    Perform deep web research on lipid biology questions using Perplexity's SONAR model.
+    Perform deep web research on physiological maps questions using Perplexity's SONAR model.
     Returns citation-rich answers based on current scientific literature.
     
     Args:
-        question: A question about lipid biology, transporters, or metabolism
+        question: A question about physiological maps, transporters, or metabolism
         
     Returns:
         Comprehensive web research results with citations

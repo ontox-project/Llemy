@@ -1,10 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Marie Corradi
+
 import requests
 import pandas as pd
 from datetime import datetime
 
 def get_available_projects():
     """
-    Retrieves information about licensed projects from MinervaNet machines.
+    Retrieves information about public licensed projects from MinervaNet machines.
     """
     base_url = "https://minerva-net.lcsb.uni.lu/api"
 

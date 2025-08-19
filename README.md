@@ -1,6 +1,6 @@
 # LLMapperino
 
-A multi-agent system for answering specialized questions by combining structured knowledge from user-selected MINERVA API maps with web research via Perplexity.
+A multi-agent system for answering specialized questions on physiological maps by combining structured knowledge from user-selected MINERVA API maps with web research via Perplexity.
 
 ## Overview
 
@@ -8,7 +8,7 @@ LLMapperino is a prototype application that provides an intelligent interface fo
 
 1. **Minerva Agent**: Fetches and processes the full map data from a user-selected MINERVA project.
 2. **Perplexity Agent**: Performs deep web research using the Perplexity SONAR model.
-3. **Synthesis Agent**: Combines information from both sources into comprehensive, scientifically rigorous answers.
+3. **Synthesis Agent**: Combines information from both sources.
 
 The system is designed to answer specialized questions by reasoning over the context of the selected MINERVA map and relevant web research.
 
@@ -26,12 +26,10 @@ graph TD
         D --> E[Minerva Agent];
         D --> F[Perplexity Agent];
 
-        E --> G["minerva_map_data_retriever(question, project_id)"];
-        G --> H["MINERVA API <br> (Fetch Full Map Data)"];
+        E --> H["MINERVA API <br> (Fetch Full Map Data)"];
         H --> I[Structured Map Context];
 
-        F --> J["perplexity_web(question)"];
-        J --> K["Perplexity API <br> (Web Research)"];
+        F --> K["Perplexity API <br> (Web Research)"];
         K --> L[Web Research Context];
 
         I --> M{2\. Synthesize Information};

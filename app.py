@@ -2,10 +2,10 @@
 # Copyright 2025 Ivo Djidrovski, Marie Corradi
 
 """
-Streamlit UI for Fatty Acid Assistant
+Streamlit UI 
 
-This module provides a user interface for interacting with the Fatty Acid Assistant,
-allowing users to ask questions about lipid biology and view comprehensive answers.
+This module provides a user interface for interacting with the Assistant,
+allowing users to ask questions about physiological maps and view comprehensive answers.
 """
 
 import streamlit as st
@@ -179,6 +179,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## Example Questions")
     
+    #TODO: more general example questions
     example_questions = [
         "List three specific inhibitors of CD36 and tell me which general molecular processes would be mainly impaired",
         "Tell me an alternative to FATP2 if I want to test for the functionality of bile canalicular efflux",

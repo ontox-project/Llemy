@@ -3,14 +3,13 @@
 
 """
 #TODO: more general description
-Workflow Module for Fatty Acid Assistant
+Workflow Module 
 
 This module defines the LangChain workflow that orchestrates the multi-agent system
-for answering lipid biology questions using the Ontox API and Perplexity web research.
+for answering physiological maps questions using the MINERVA API and Perplexity web research.
 """
 
 from typing import Dict, Any
-#from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage
 from langchain.prompts import ChatPromptTemplate
@@ -18,7 +17,6 @@ from langchain.schema.runnable import RunnableParallel, RunnablePassthrough
 
 # Import our custom tools
 from minerva_client import minerva_map_data_retriever
-from minerva_utils import get_available_projects
 from perplexity_client import perplexity_web
 from config import get_openai_api_key
 
@@ -50,7 +48,7 @@ def search_agent(question: str) -> Dict[str, Any]:
     Agent that performs web research using Perplexity.
     
     Args:
-        question: The user's question about lipid biology
+        question: The user's question about physiological maps
         
     Returns:
         Dictionary with web research status and data/error
