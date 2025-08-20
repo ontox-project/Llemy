@@ -90,7 +90,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better appearance
+# Custom CSS for UX
 st.markdown("""
 <style>
     .main-header {
@@ -117,6 +117,13 @@ st.markdown("""
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
     }
+    [data-testid="stTooltipContent"] {
+        font-size: 14px !important;
+        color: white !important;
+        background: #333 !important;
+        border-radius: 6px !important;
+        padding: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,7 +137,7 @@ with st.sidebar:
     st.markdown("## About")
     
     st.markdown("""
-    This application helps researchers explore questions about biological pathway maps available via the MINERVA API.
+    This application helps researchers explore questions about physiological maps available via the MINERVA API.
     
     It combines:
     - Structured data from a user-selected MINERVA project map
