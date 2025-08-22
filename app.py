@@ -5,7 +5,7 @@
 Streamlit UI 
 
 This module provides a user interface for interacting with the Assistant,
-allowing users to ask questions about physiological maps and view comprehensive answers.
+allowing users to ask questions about physiological maps and view answers.
 """
 
 import streamlit as st
@@ -137,12 +137,7 @@ with st.sidebar:
     st.markdown("## About")
     
     st.markdown("""
-    This application helps researchers explore questions about physiological maps available via the MINERVA API.
-    
-    It combines:
-    - Structured data from a user-selected MINERVA project map
-    - Web research from Perplexity
-    - AI synthesis for comprehensive answers
+    Insert link to full documentation
     """)
     
     st.markdown("---")
@@ -158,12 +153,15 @@ with st.sidebar:
 
     # UI: project selection
     if st.session_state.minerva_projects:
-        project_options = [p['project'] for p in st.session_state.minerva_projects]
+        # Show names in dropdown
+        project_options = [p['name'] for p in st.session_state.minerva_projects]
 
         # Default selection logic
         default_index = 0
-        if DEFAULT_PROJECT_ID in project_options:
-            default_index = project_options.index(DEFAULT_PROJECT_ID)
+        if DEFAULT_PROJECT_ID in [p['project'] for p in st.session_state.minerva_projects]:
+            default_index = project_options.index(
+                next(p['name'] for p in st.session_state.minerva_projects if p['project'] == DEFAULT_PROJECT_ID)
+            )
 
         selected_project_name = st.selectbox(
             "Select MINERVA Project:",
@@ -172,12 +170,19 @@ with st.sidebar:
             key="selected_minerva_project_name"
         )
 
-        st.session_state.selected_minerva_project_id = selected_project_name
-        st.session_state.selected_machine_url = next((p["machine_url"] for p in st.session_state.minerva_projects if p["project"] == selected_project_name), None)
+        # Find the matching project dict
+        selected_project = next(
+            (p for p in st.session_state.minerva_projects if p["name"] == selected_project_name),
+            None
+        )
+
+        st.session_state.selected_minerva_project_id = selected_project["project"] if selected_project else None
+        st.session_state.selected_machine_url = selected_project["machine_url"] if selected_project else None
 
     elif "minerva_projects" in st.session_state:
         st.warning("No MINERVA projects available or failed to load.")
 
+    st.text_input("(Optional) What expertise are you interested in (e.g., liver, brain, etc.):", key="expertise")
 
     @st.cache_resource
     def get_minerva_client(base_url: str) -> MinervaClient:
@@ -246,11 +251,12 @@ def process_query(query):
     if not selected_machine_url:
         st.error("No machine URL associated to project.")
         return "Error: No machine URL associated to project.", None, None
+    expertise = st.session_state.get("expertise")
 
     with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' and performing web research..."):
         try:
             # Pass the selected project_id to the assistant_chain
-            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url})
+            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url, "expertise": expertise})
             answer = result.get("final_answer", "Error: No response generated.")
             api_status_details = result.get("api_status_details")
             web_status_details = result.get("web_status_details")
@@ -337,7 +343,7 @@ if not st.session_state.history:
     - Type your own question in the input box below
     - Try one of the example questions from the sidebar
     
-    The system will combine information from the MINERVA API and web research to provide comprehensive answers.
+    The system will combine information from the MINERVA API and web research to provide answers.
     """)
 
 # Footer

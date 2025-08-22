@@ -43,10 +43,11 @@ def get_available_projects():
 
         for project in projects_data.get('pageContent', []):
             # Ensure required keys exist before accessing
-            if all(k in project for k in ['machine', 'projectId', 'license', 'createdAt', 'disease']):
+            if all(k in project for k in ['machine', 'projectId', 'mapName', 'license', 'createdAt', 'disease']):
                 all_projects_list.append({
                     'machine': project['machine'].get('rootUrl'),
                     'project': project['projectId'],
+                    'name': project['mapName'],
                     'license': project['license'],
                     'created': project['createdAt'],
                     'disease': project['disease']
@@ -68,12 +69,13 @@ def get_available_projects():
     # Pick the most recent entry
     summarized_df = licensed_projects_sorted.groupby(['machine', 'disease']).agg(
         project=('project', 'first'),
+        name=('name', 'first'),
         license=('license', 'first'),
         created=('created', 'first')
     ).reset_index()
 
 
-    final_df = summarized_df[['machine', 'project']]
-    projects = [{"project": row["project"],"machine_url": row["machine"]}for _, row in final_df.iterrows()]
+    final_df = summarized_df[['machine', 'project', 'name']]
+    projects = [{"project": row["project"], "name": row["name"],"machine_url": row["machine"]}for _, row in final_df.iterrows()]
 
     return projects
