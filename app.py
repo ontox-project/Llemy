@@ -234,8 +234,14 @@ if "history" not in st.session_state:
 if "query" not in st.session_state:
     st.session_state.query = ""
 
+if "api_answer" not in st.session_state:
+    st.session_state.api_answer = None
+
+if "final_answer" not in st.session_state:
+    st.session_state.final_answer = None
+
 # Function to process the query
-def process_query(query):
+def process_query(query, run_web=False):
     start_time = time.time()
     
     api_status_details = None
@@ -253,15 +259,15 @@ def process_query(query):
         return "Error: No machine URL associated to project.", None, None
     expertise = st.session_state.get("expertise")
 
-    with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' and performing web research..."):
+    with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' "):
         try:
             # Pass the selected project_id to the assistant_chain
-            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url, "expertise": expertise})
-            answer = result.get("final_answer", "Error: No response generated.")
-            api_status_details = result.get("api_status_details")
-            web_status_details = result.get("web_status_details")
+            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url, "expertise": expertise,"run_web": run_web,})
+            api_answer = result.get("final_answer", "Error: No response generated.")
+            api_status_details = result.get("api_status_details", {"status": "unknown"})
+            web_status_details = result.get("web_status_details",{"status": "skipped"} if not run_web else {"status": "unknown"})
         except Exception as e:
-            answer = f"Error processing your query: {str(e)}"
+            api_answer = f"Error processing your query: {str(e)}"
             # Ensure status details are initialized even on error to prevent NoneType issues later
             api_status_details = {"status": "error", "error_message": str(e)}
             web_status_details = {"status": "error", "error_message": str(e)}
@@ -269,7 +275,7 @@ def process_query(query):
     end_time = time.time()
     st.session_state.response_time = end_time - start_time
     
-    return answer, api_status_details, web_status_details
+    return api_answer, api_status_details, web_status_details
 
 # Main chat interface
 query = st.chat_input("Ask about biology, transporters, or metabolism...", key="chat_input")
@@ -284,7 +290,9 @@ if query:
     st.session_state.history.append({"role": "user", "content": query, "api_status": None, "web_status": None, "minerva_data": None})
     
     # Process the query
-    answer, api_status, web_status = process_query(query)
+    api_answer, api_status, web_status = process_query(query, run_web=False)
+    st.session_state.api_answer = api_answer
+    st.session_state.final_answer = st.session_state.api_answer
     
     # Extract Minerva raw data if available from the result
     minerva_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
@@ -292,11 +300,13 @@ if query:
     # Add assistant response to history
     st.session_state.history.append({
         "role": "assistant", 
-        "content": answer, 
+        "content": api_answer, 
         "api_status": api_status, 
         "web_status": web_status,
         "minerva_data": minerva_data # Store the raw Minerva data
     })
+
+
 
 # Display chat history
 for message in st.session_state.history:
@@ -331,6 +341,18 @@ for message in st.session_state.history:
                     st.error(f"Status: {perplexity_status['status']}")
                     st.caption(f"Error: {perplexity_status.get('error_message', 'Unknown error')}")
 
+
+if st.session_state.api_answer and st.session_state.final_answer == st.session_state.api_answer:
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔍 I would like to search the web for further information"):
+            enriched = process_query(st.session_state.last_question, run_web=True)
+            st.session_state.final_answer = enriched
+            st.session_state.messages.append({"role": "assistant", "content": enriched})
+            st.experimental_rerun()
+    with col2:
+        if st.button("✅ I have enough information"):
+            st.session_state.final_answer = st.session_state.api_answer
 
 # Display a getting started message if history is empty
 if not st.session_state.history:

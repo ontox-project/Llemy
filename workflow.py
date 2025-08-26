@@ -13,7 +13,7 @@ from typing import Dict, Any
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.runnable import RunnableParallel, RunnablePassthrough
+from langchain.schema.runnable import RunnableParallel, RunnablePassthrough, RunnableLambda
 
 # Import our custom tools
 from minerva_client import minerva_map_data_retriever
@@ -21,11 +21,11 @@ from perplexity_client import perplexity_web
 from config import get_openai_api_key
 
 
-MODEL_NAME="gpt-4.1-mini" #changed for increased context, but still limited for some maps
+MODEL_NAME="gpt-5-nano" #changed for deprecation of older models - should still be good at summarization
 model_name=MODEL_NAME
 
 def get_llm():
-    return ChatOpenAI(model_name=model_name, temperature=0.0, api_key=get_openai_api_key())
+    return ChatOpenAI(model_name=model_name, temperature=1, api_key=get_openai_api_key()) #gpt5-nano only supports temperature of 1
 
 def api_agent(inputs: Dict[str, Any]) -> Dict[str, str]:
     """
@@ -33,7 +33,7 @@ def api_agent(inputs: Dict[str, Any]) -> Dict[str, str]:
     
     Args:
         inputs: Dictionary containing the user's question and selected project_id.
-                Expected keys: 'question', 'project_id', machine_url.
+                Expected keys: 'question', 'project_id', 'machine_url'.
         
     Returns:
         Dictionary with API response status and data/error
@@ -57,16 +57,24 @@ def search_agent(question: str) -> Dict[str, Any]:
 
 # Create a parallel retrieval component that runs both agents concurrently
 # This part remains the same, but the output of api_agent and search_agent is now structured
-parallel_retrieval = RunnableParallel(
-    api_result=api_agent, # Renamed to avoid conflict with 'api' key in synth_agent
-    web_result=search_agent  # Renamed to avoid conflict with 'web' key in synth_agent
-)
+#parallel_retrieval = RunnableParallel(
+#    api_result=api_agent, # Renamed to avoid conflict with 'api' key in synth_agent
+#    web_result=search_agent  # Renamed to avoid conflict with 'web' key in synth_agent
+#)
+# Wrap each tool
+api_result=lambda x: api_agent.invoke({
+    "question": x.get("question"),
+    "project_id": x.get("project_id"),
+    "machine_url": x.get("machine_url"),
+})
+
+web_result=lambda x: search_agent.invoke(x["question"])
 
 # System prompt for the synthesis agent
 #TODO: make prompt more general
 SYNTH_SYSTEM_PROMPT = """
-You are a senior toxicologist specializing in hepatic lipid metabolism.
-Your task is to synthesize information from two sources to answer the user's QUESTION:
+You are a senior biomedical scientist specializing in hepatic lipid metabolism.
+Your task is to synthesize information from various sources to answer the user's QUESTION:
 1.  **MINERVA Map Data**: This is a comprehensive dump of all reactions and elements from a specific metabolic map. It describes reactions, their participants (reactants, products, modifiers), and details about these elements (names, symbols, annotations). You will need to parse this information to find what's relevant to the QUESTION. Clearly label information derived from this source as "(Source: Minerva Map Data)". If the provided map data doesn't seem to contain information relevant to the QUESTION, state that. If there was an error retrieving this map data, that will be indicated.
 2.  **Perplexity Web Research**: Provides broader scientific context and citations from web searches. Clearly label information from this source as "(Source: Perplexity Web Research)" and include any provided citations. If there was an error or no data was found from Perplexity, state that.
 
@@ -80,6 +88,10 @@ Your answer should:
 - Highlight areas of scientific consensus and ongoing research questions relevant to the QUESTION.
 - Present information in a well-structured format with appropriate headings.
 - Explicitly state the source of each piece of information or the status of the data retrieval.
+
+Highlight first the evidence coming from the MINERVA map, then evidence coming from any other source. 
+
+After each statement, give a structured list of pertinent references with hyperlinks.
 
 Remember to maintain scientific integrity and acknowledge any limitations in the available information.
 """
@@ -101,7 +113,7 @@ Web Research Content:
 {web_content}
 Error (if any): {web_error}
 
-Please synthesize a comprehensive answer to the USER QUESTION based on the available data from both sources, clearly attributing information and noting any retrieval issues as instructed in the system prompt. Focus on finding information within the Minerva Map Data that is relevant to the USER QUESTION.
+Please synthesize a comprehensive answer to the USER QUESTION based on the available data from both sources, clearly attributing information and noting any retrieval issues as instructed in the system prompt. Focus on finding information within the Minerva Map Data that is relevant to the USER QUESTION. Present information from the Minerva map data first.
 """
 
 # Create prompt template for synthesis
@@ -123,9 +135,17 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
     Returns:
         Dictionary with the final synthesized answer and the raw API results for UI display.
     """
-    question = inputs["question"]
-    api_result = inputs.get("api_result", {"status": "error", "data": None, "error_message": "Minerva agent did not run."})
-    web_result = inputs.get("web_result", {"status": "error", "data": None, "error_message": "Perplexity agent did not run."})
+    question = inputs.get("question", "No question provided.")
+    api_result = inputs.get("api_result") or {
+        "status": "error",
+        "data": None,
+        "error_message": "Minerva agent did not run."
+    }
+
+    web_result = inputs.get("web_result")
+    if web_result is None:
+        # If web tool was skipped
+        web_result = {"status": "skipped", "data": None, "error_message": None}
 
     api_content = api_result.get("data", "No data available from Minerva API.")
     if api_result.get("status") == "success" and not api_content.startswith("## Minerva API Results"):
@@ -166,24 +186,33 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, str]:
     }
 
 # Define the complete workflow
-# 1. Take the user question.
-# 2. Run api_agent and search_agent in parallel.
-# 3. Pass their structured results and the original question to synth_agent_adapter.
-# 4. synth_agent_adapter formats this for the LLM and gets the final answer.
-workflow = (
-    RunnablePassthrough.assign(
-        question=lambda x: x.get("question"),
-        project_id=lambda x: x.get("project_id"),
-        machine_url=lambda x: x.get("machine_url") 
-    )
-    | RunnablePassthrough.assign(
-        api_result=lambda x: api_agent({"question": x.get("question"), "project_id": x.get("project_id"), "machine_url":x.get("machine_url")}),
-        web_result=lambda x: search_agent(x["question"])
-    )
-    | synth_agent_adapter
+# First run MINERVA API
+# Then ask if the user want to perform a web search
+base = RunnablePassthrough.assign(
+    question=lambda x: x.get("question"),
+    project_id=lambda x: x.get("project_id"),
+    machine_url=lambda x: x.get("machine_url")
 )
 
+with_api = base.assign(
+    api_result=lambda x: api_agent({
+        "question": x.get("question"),
+        "project_id": x.get("project_id"),
+        "machine_url": x.get("machine_url")
+    })
+)
+
+def maybe_web(x):
+    # Note: GPT5-nano seems to be doing web search on its own
+    if x.get("run_web", False):
+        return search_agent(x["question"])
+    return None
+
+with_web = with_api.assign(web_result=maybe_web)
+
 # Compile the workflow for use
+
+workflow = with_web | synth_agent_adapter
 assistant_chain = workflow
 
 if __name__ == "__main__":

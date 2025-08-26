@@ -187,14 +187,14 @@ This project is intended for research and educational purposes only.
 ## Authors
 
 - Ivo Djidrovski (i.djidrovski@uu.nl)
-- Maia Ladeira Luiz Carlos
-- Marek OSTASZEWSKI
 - Marie Corradi
+- Marek Ostaszewski
+- Luiz Carlos Maia Ladeira 
 - Bernard Staumont
 
 ## Acknowledgements
 
-- This project was a collaboration with VHP4 Safety, Ontox and Elixir Europe.
+- This project was a collaboration between ONTOX, VHP4Safety,and Elixir Europe.
 - MINERVA API (via ontox.elixir-luxembourg.org) for providing structured data on liver lipid metabolism
 - Perplexity for web research capabilities
 - LangChain for the agent orchestration framework
