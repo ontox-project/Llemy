@@ -4,6 +4,7 @@
 import requests
 import pandas as pd
 from datetime import datetime
+import re
 
 def get_available_projects():
     """
@@ -79,3 +80,52 @@ def get_available_projects():
     projects = [{"project": row["project"], "name": row["name"],"machine_url": row["machine"]}for _, row in final_df.iterrows()]
 
     return projects
+
+def extract_reaction_ids(text):
+    """
+    Extract all numeric reaction IDs from text.
+    Returns a list of unique numeric IDs (as strings).
+    """
+    pattern = re.compile(
+        r"(?:Reactions?\s*(?:IDs?|ID)?[:\s]*)"      
+        r"([\d\s,;and]+)",                        
+        flags=re.IGNORECASE,
+    )
+
+    found_ids = []
+    for chunk in pattern.findall(text):
+        ids = re.findall(r"\b\d+\b", chunk)
+        for rid in ids:
+            if rid not in found_ids:
+                found_ids.append(rid)
+    return found_ids
+
+def make_url(base_url, project_id, reactions_list):
+    """
+    Makes a url to MINERVA map with highlighted reactions
+    """
+    reactions_string = "%3B".join(map(str, reactions_list))
+    return f"{base_url}index.html?id={project_id}&perfectMatch=true&searchValue={reactions_string}"
+
+def append_reaction_links(text, base_url, project_id):
+    """
+    Appends URLs to any line or sentence that mentions Reaction IDs.
+    Works for bullet points, lists, and irregular sentence structures.
+    """
+
+    # Split by newline or by punctuation + space (for both prose and bullet lists)
+    segments = re.split(r'(?:\n+|(?<=[.!?])\s+)', text.strip())
+
+    updated_segments = []
+    for seg in segments:
+        if not seg.strip():
+            continue 
+
+        reactions_list = extract_reaction_ids(seg)
+        if reactions_list:
+            url = make_url(base_url, project_id, reactions_list)
+            seg = f"{seg.strip()} ([link]({url}))"
+        updated_segments.append(seg.strip())
+
+    # Rejoin using newlines to preserve bullet formatting
+    return "\n".join(updated_segments)

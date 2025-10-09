@@ -20,6 +20,7 @@ from langchain.tools import tool
 import logging
 import requests
 import pandas as pd
+from minerva_utils import *
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -37,31 +38,7 @@ class MinervaClient(httpx.Client):
         self.base_url = base_url.rstrip("/")+ "/api"
         self.project_id = project_id
         super().__init__(*args, base_url=self.base_url, follow_redirects=True, timeout=60, **kwargs)
-        #self._authenticate()
 
-    #def _authenticate(self):
-    #    # enot needed for anonymous login
-    #   
-    #    login_payload = f"login=anonymous&password="
-    #    login_headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
-    #    try:
-    #        response = self.post("/doLogin", content=login_payload.encode("utf-8"), headers=login_headers)
-    #        response.raise_for_status()
-    #        log.info("MINERVA Client: Anonymous login successful.")
-    #    except httpx.HTTPStatusError as e:
-    #        log.error(f"MINERVA Client: Anonymous login failed ({e.response.status_code}).")
-    #        raise ValueError("MINERVA authentication failed. Anonymous login rejected.") from e
-    #    except Exception as e:
-    #        log.error(f"MINERVA Client: Unexpected error during authentication: {str(e)}")
-    #        raise
-
-    #@tenacity.retry(
-    #    wait=tenacity.wait_random_exponential(min=2, max=30),
-    #    stop=tenacity.stop_after_attempt(3),
-    #    retry=tenacity.retry_if_exception_type((httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException)),
-    #    reraise=True
-    #)
     def _call_api(self, method: str, path: str, **kwargs) -> Any:
         log.debug(f"Calling MINERVA API: {method} {path} with params {kwargs.get('params')}")
         params = kwargs.pop("params", {})
@@ -195,11 +172,6 @@ def format_reactions_for_llm(reactions_list: List[Dict[str, Any]], elements_df: 
 
 
 
-def format_link(base_url, project_id, reactions_list):
-    reactions_string = "%3B".join(map(str, reactions_list))
-    return f"{base_url}/minerva/index.html?id={project_id}&perfectMatch=true&searchValue={reactions_string}"
-
-
 @tool("minerva_map_data_retriever")
 def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID, machine_url: Optional[str] = BASE_URL) -> Dict[str, Any]:
     """
@@ -260,17 +232,12 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
 
 if __name__ == "__main__":
     print("--- Testing Minerva API Client (Full Map Data Retrieval with Reaction Refs) ---")
-    
-    # Example of how to invoke with a specific project ID for testing
-    # Replace 'your_test_project_id' with an actual project ID from the list
-    # result = minerva_map_data_retriever.invoke({"project_id": "Liver_Lipid_Metabolism_Physiological_Map_August_2024"})
-    
-    # Default invocation without specifying project_id (uses PROJECT_ID constant)
+
     result = minerva_map_data_retriever.invoke({}) 
     
     print(f"\nStatus: {result['status']}")
     if result['status'] == 'success':
-        print(f"\nFirst 1500 characters of formatted data:\n{result['data'][:1500]}...") # Show more data
+        print(f"\nFirst 1500 characters of formatted data:\n{result['data'][:1500]}...")
     elif result['error_message']:
         print(f"\nError: {result['error_message']}")
     else:

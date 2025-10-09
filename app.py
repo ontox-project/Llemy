@@ -2,16 +2,15 @@
 # Copyright 2025 Ivo Djidrovski, Marie Corradi
 
 """
-Streamlit UI 
+Streamlit UI for Fatty Acid Assistant
 
-This module provides a user interface for interacting with the Assistant,
-allowing users to ask questions about physiological maps and view answers.
+This module provides a user interface for interacting with the Fatty Acid Assistant,
+allowing users to ask questions about lipid biology and view comprehensive answers.
 """
 
 import streamlit as st
 from datetime import datetime, timedelta
 import time
-import uuid
 
 # --- Constants
 EXPIRATION_MINUTES = 20
@@ -62,9 +61,9 @@ else:
 
 
 # Lazy import to avoid api key issues
-from workflow import api_chain, web_chain, MODEL_NAME
+from workflow import api_chain, MODEL_NAME
 from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID
-from minerva_utils import get_available_projects 
+from minerva_utils import * 
 
 # Set up the Streamlit page
 st.set_page_config(
@@ -74,7 +73,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for UX
+# Custom CSS for better appearance
 st.markdown("""
 <style>
     .main-header {
@@ -101,19 +100,12 @@ st.markdown("""
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
     }
-    [data-testid="stTooltipContent"] {
-        font-size: 14px !important;
-        color: white !important;
-        background: #333 !important;
-        border-radius: 6px !important;
-        padding: 8px !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # Application header
 st.markdown("<h1 class='main-header'>LLMapperino</h1>", unsafe_allow_html=True)
-st.markdown("<h3 class='sub-header'>A Multi-Agent System for MINERVA Map Exploration</h3>", unsafe_allow_html=True)
+st.markdown("<h3 class='sub-header'>An Agentic System for MINERVA Map Exploration</h3>", unsafe_allow_html=True)
 
 # Sidebar for settings and info
 with st.sidebar:
@@ -121,7 +113,7 @@ with st.sidebar:
     st.markdown("## About")
     
     st.markdown("""
-    Insert link to full documentation
+    This application helps you explore questions about disease or physiological maps available via the MINERVA API.
     """)
     
     st.markdown("---")
@@ -137,15 +129,12 @@ with st.sidebar:
 
     # UI: project selection
     if st.session_state.minerva_projects:
-        # Show names in dropdown
-        project_options = [p['name'] for p in st.session_state.minerva_projects]
+        project_options = [p['project'] for p in st.session_state.minerva_projects]
 
         # Default selection logic
         default_index = 0
-        if DEFAULT_PROJECT_ID in [p['project'] for p in st.session_state.minerva_projects]:
-            default_index = project_options.index(
-                next(p['name'] for p in st.session_state.minerva_projects if p['project'] == DEFAULT_PROJECT_ID)
-            )
+        if DEFAULT_PROJECT_ID in project_options:
+            default_index = project_options.index(DEFAULT_PROJECT_ID)
 
         selected_project_name = st.selectbox(
             "Select MINERVA Project:",
@@ -154,19 +143,12 @@ with st.sidebar:
             key="selected_minerva_project_name"
         )
 
-        # Find the matching project dict
-        selected_project = next(
-            (p for p in st.session_state.minerva_projects if p["name"] == selected_project_name),
-            None
-        )
-
-        st.session_state.selected_minerva_project_id = selected_project["project"] if selected_project else None
-        st.session_state.selected_machine_url = selected_project["machine_url"] if selected_project else None
+        st.session_state.selected_minerva_project_id = selected_project_name
+        st.session_state.selected_machine_url = next((p["machine_url"] for p in st.session_state.minerva_projects if p["project"] == selected_project_name), None)
 
     elif "minerva_projects" in st.session_state:
         st.warning("No MINERVA projects available or failed to load.")
 
-    st.text_input("(Optional) What expertise are you interested in (e.g., liver, brain, etc.):", key="expertise")
 
     @st.cache_resource
     def get_minerva_client(base_url: str) -> MinervaClient:
@@ -175,7 +157,6 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## Example Questions")
     
-    #TODO: more general example questions
     example_questions = [
         "List three specific inhibitors of CD36 and tell me which general molecular processes would be mainly impaired",
         "Tell me an alternative to FATP2 if I want to test for the functionality of bile canalicular efflux",
@@ -189,21 +170,10 @@ with st.sidebar:
         "What is the abundance of FATP transporters in the liver?",
         "Is valproic acid inhibitor of OTG2?"
     ]
-
-    def set_prompt(example_text):
-        st.session_state.pending_query = example_text
-
-    def shorten_text(text, max_chars=50):
-        return text if len(text) <= max_chars else text[:max_chars-3] + "..."
     
     for q in example_questions:
-        st.button(
-            label=shorten_text(q),
-            help=q, 
-            on_click=set_prompt,
-            args=(q,)
-        )
-
+        if st.button(q[:50] + "..." if len(q) > 50 else q):
+            st.session_state.query = q
     
     st.markdown("---")
     st.markdown("### Performance Metrics")
@@ -215,37 +185,14 @@ with st.sidebar:
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "queries" not in st.session_state:
-    st.session_state.queries = {}
-
-if "api_answer" not in st.session_state:
-    st.session_state.api_answer = None
-
-if "final_answer" not in st.session_state:
-    st.session_state.final_answer = None
-
-if "web_final_answer" not in st.session_state:
-    st.session_state.web_final_answer = None
-
-if "api_status" not in st.session_state:
-    st.session_state.api_status = None
-
-if "web_status" not in st.session_state:
-    st.session_state.web_status = {"status": "skipped"}
-
-if "pending_query" not in st.session_state:
-    st.session_state.pending_query = None
-
-
+if "query" not in st.session_state:
+    st.session_state.query = ""
 
 # Function to process the query
-def process_query(query, run_web=False):
+def process_query(query):
     start_time = time.time()
     
-    api_answer = None
-    web_answer = None
     api_status_details = None
-    web_status_details = None
     
     # Get the selected project ID from session state
     selected_project_id = st.session_state.get("selected_minerva_project_id")
@@ -257,124 +204,75 @@ def process_query(query, run_web=False):
     if not selected_machine_url:
         st.error("No machine URL associated to project.")
         return "Error: No machine URL associated to project.", None, None
-    
-    expertise = st.session_state.get("expertise")
 
-    with st.spinner(f"Retrieving knowledge"):
+    with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' ..."):
         try:
-            st.session_state.query = query  
-            if run_web:
-                web_result = web_chain.invoke({"question": query})
-                st.session_state.web_result = web_result
-
-                web_answer = web_result.get("data", "No data available")
-                web_status_details = web_result
-
-            else:
-                api_result = api_chain.invoke({
-                    "question": query,
-                    "project_id": selected_project_id,
-                    "machine_url": selected_machine_url,
-                })
-                st.session_state.api_result = api_result
-
-                # Get a synthesized answer from API alone
-                api_answer = api_result.get("final_answer", "Error: No response generated from API.")
-                api_status_details = api_result.get("api_status_details", {"status": "unknown"})
-                web_status_details = {"status": "skipped"}
-                #final_answer = api_answer
-
-
+            # Pass the selected project_id to the assistant_chain
+            result = api_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url})
+            answer = result.get("final_answer", "Error: No response generated.")
+            # Add links to MINERVA map in answer
+            answer = append_reaction_links(answer, selected_machine_url, selected_project_id)
+            api_status_details = result.get("api_status_details")
         except Exception as e:
-            api_answer = f"Error processing your query: {str(e)}"
-            web_answer = f"Error processing your query: {str(e)}"
+            answer = f"Error processing your query: {str(e)}"
             # Ensure status details are initialized even on error to prevent NoneType issues later
             api_status_details = {"status": "error", "error_message": str(e)}
-            web_status_details = {"status": "error", "error_message": str(e)}
 
     end_time = time.time()
     st.session_state.response_time = end_time - start_time
     
-    return api_answer, web_answer, api_status_details, web_status_details
+    return answer, api_status_details
 
 # Main chat interface
 query = st.chat_input("Ask about biology, transporters, or metabolism...", key="chat_input")
 
-# Buffer example question if clicked
-if st.session_state.get("pending_query") and not query:
-    query = st.session_state.pending_query
-    st.session_state.pending_query = "" 
+# Process query from session state (if set by example button)
+if st.session_state.query and not query:
+    query = st.session_state.query
+    st.session_state.query = "" 
 
-# Process question
 if query:
-    query_id = str(uuid.uuid4())
-    st.session_state.queries[query_id] = {
-        "query": query,
-        "api_result": None,
-        "web_result": None
-    }
     # Add user query to history
-    st.session_state.history.append({
-        "id": query_id,
-        "message_id": str(uuid.uuid4()),
-        "role": "user",
-        "content": query,
-        "api_status": None,
-        "web_status": None,
-        "minerva_data": None
-    })
+    st.session_state.history.append({"role": "user", "content": query, "api_status": None, "minerva_data": None})
+    
     # Process the query
-    api_answer, web_answer, api_status, web_status = process_query(query, run_web=False)
-    st.session_state.queries[query_id]["api_answer"] = api_answer
-    st.session_state.queries[query_id]["web_answer"] = web_answer
-    st.session_state.queries[query_id]["api_status"] = api_status
-    st.session_state.queries[query_id]["web_status"] = web_status
- 
+    answer, api_status = process_query(query)
     
     # Extract Minerva raw data if available from the result
     minerva_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
 
     # Add assistant response to history
     st.session_state.history.append({
-        "id": query_id,
-        "message_id": str(uuid.uuid4()),
         "role": "assistant", 
-        "content": api_answer, 
+        "content": answer, 
         "api_status": api_status, 
-        "web_status": web_status,
         "minerva_data": minerva_data 
     })
 
+# Display chat history
+for message in st.session_state.history:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        # Display Minerva raw data if available for assistant messages
+        if message["role"] == "assistant" and message.get("minerva_data"):
+             with st.expander("Minerva API Data Retrieved", expanded=False):
+                 st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True)
+        
+        # Display API Call Status
+        if message["role"] == "assistant" and message.get("api_status"):
+            with st.expander("API Call Status Details", expanded=False):
+                st.markdown("##### Minerva API")
+                minerva_status = message["api_status"]
+                if minerva_status["status"] == "success":
+                    st.success(f"Status: {minerva_status['status']}")
+                    # st.text_area("Data Snippet:", value=str(minerva_status.get('data', ''))[:200]+"...", height=100, disabled=True)
+                elif minerva_status["status"] == "no_data_found":
+                    st.warning(f"Status: {minerva_status['status']}")
+                    st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
+                else: # error
+                    st.error(f"Status: {minerva_status['status']}")
+                    st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
 
-last_query_id = next(
-    (m["id"] for m in reversed(st.session_state.history) if m["role"] == "user"),
-    None
-)
-
-if last_query_id and st.session_state.queries[last_query_id]["web_status"]["status"]== "skipped" and st.session_state.queries[last_query_id]["api_status"] is not None:
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔍 I would like to search the web for further information", key=f"search_btn_{len(st.session_state.history)}"):
-            api_answer, web_answer, api_status, web_status = process_query(st.session_state.query, run_web=True)
-            st.session_state.queries[last_query_id]["web_answer"] = web_answer
-            st.session_state.queries[last_query_id]["web_status"] = web_status
-            st.session_state.history.append({
-                "id": last_query_id,
-                "message_id": str(uuid.uuid4()),
-                "role": "assistant",
-                "content": web_answer,
-                "api_status": {"status": "skipped"},
-                "web_status": web_status,
-                "minerva_data": None
-            })
-            st.rerun()
-    with col2:
-        if st.button("✅ I have enough information", key=f"skip_btn_{len(st.session_state.history)}"):
-            st.session_state.ask_new_query = True
-            st.rerun()
-else:
-    st.session_state.ask_new_query = True
-    st.rerun()
 
 # Display a getting started message if history is empty
 if not st.session_state.history:
@@ -386,44 +284,14 @@ if not st.session_state.history:
     You can:
     - Type your own question in the input box below
     - Try one of the example questions from the sidebar
-    
-    The system will combine information from the MINERVA API and web research to provide answers.
     """)
-
-# Display chat history
-else:
-    for message in st.session_state.history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            # Display Minerva raw data if available for assistant messages
-            if message["role"] == "assistant" and message.get("minerva_data"):
-                with st.expander("Minerva API Data Retrieved", expanded=False):
-                    st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True,key=f"assistant_output__{message['message_id']}")
-            
-            # Display API Call Status
-            if message["role"] == "assistant" and message.get("api_status"):
-                with st.expander("API Call Status Details", expanded=False):
-                    st.markdown("##### Minerva API")
-                    minerva_status = message["api_status"]
-                    if minerva_status["status"] == "success":
-                        st.success(f"Status: {minerva_status['status']}")
-                        # st.text_area("Data Snippet:", value=str(minerva_status.get('data', ''))[:200]+"...", height=100, disabled=True)
-                    elif minerva_status["status"] == "no_data_found":
-                        st.warning(f"Status: {minerva_status['status']}")
-                        st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
-                    else: # error
-                        st.error(f"Status: {minerva_status['status']}")
-                        st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
-
-                    st.markdown("##### Web search")
-                    st.warning(f"Logging needs to be redone for the web search")
 
 # Footer
 st.markdown("---")
 
 st.markdown(f"""
 <small>This is a prototype application for research purposes only.  
-Developped with Streamlit, LangChain, OpenAI ({MODEL_NAME}) and Perplexity. License Apache 2.0.</small>""", unsafe_allow_html=True)
+Developped with Streamlit, LangChain and OpenAI ({MODEL_NAME}). License Apache 2.0.</small>""", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     # This will only execute when the script is run directly
