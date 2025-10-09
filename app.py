@@ -11,9 +11,10 @@ allowing users to ask questions about lipid biology and view comprehensive answe
 import streamlit as st
 from datetime import datetime, timedelta
 import time
+import uuid
 
 # --- Constants
-EXPIRATION_MINUTES = 20
+EXPIRATION_MINUTES = 30
 EXPIRATION_DELTA = timedelta(minutes=EXPIRATION_MINUTES)
 
 # --- Utility: Expiration check
@@ -113,7 +114,7 @@ with st.sidebar:
     st.markdown("## About")
     
     st.markdown("""
-    This application helps you explore questions about disease or physiological maps available via the MINERVA API.
+    Insert link to full documentation
     """)
     
     st.markdown("---")
@@ -129,12 +130,14 @@ with st.sidebar:
 
     # UI: project selection
     if st.session_state.minerva_projects:
-        project_options = [p['project'] for p in st.session_state.minerva_projects]
+        project_options = [p['name'] for p in st.session_state.minerva_projects]
 
         # Default selection logic
         default_index = 0
-        if DEFAULT_PROJECT_ID in project_options:
-            default_index = project_options.index(DEFAULT_PROJECT_ID)
+        if DEFAULT_PROJECT_ID in [p['project'] for p in st.session_state.minerva_projects]:
+            default_index = project_options.index(
+                next(p['name'] for p in st.session_state.minerva_projects if p['project'] == DEFAULT_PROJECT_ID)
+            )
 
         selected_project_name = st.selectbox(
             "Select MINERVA Project:",
@@ -143,8 +146,10 @@ with st.sidebar:
             key="selected_minerva_project_name"
         )
 
-        st.session_state.selected_minerva_project_id = selected_project_name
-        st.session_state.selected_machine_url = next((p["machine_url"] for p in st.session_state.minerva_projects if p["project"] == selected_project_name), None)
+        selected_project = next((p for p in st.session_state.minerva_projects if p["name"] == selected_project_name),None)
+
+        st.session_state.selected_minerva_project_id = selected_project["project"] if selected_project else None
+        st.session_state.selected_machine_url = selected_project["machine_url"] if selected_project else None
 
     elif "minerva_projects" in st.session_state:
         st.warning("No MINERVA projects available or failed to load.")
@@ -171,9 +176,19 @@ with st.sidebar:
         "Is valproic acid inhibitor of OTG2?"
     ]
     
+    def set_prompt(example_text):
+        st.session_state.query = example_text
+
+    def shorten_text(text, max_chars=50):
+        return text if len(text) <= max_chars else text[:max_chars-3] + "..."
+
     for q in example_questions:
-        if st.button(q[:50] + "..." if len(q) > 50 else q):
-            st.session_state.query = q
+        st.button(
+            label=shorten_text(q),
+            help=q, 
+            on_click=set_prompt,
+            args=(q,)
+        )
     
     st.markdown("---")
     st.markdown("### Performance Metrics")
@@ -233,7 +248,7 @@ if st.session_state.query and not query:
 
 if query:
     # Add user query to history
-    st.session_state.history.append({"role": "user", "content": query, "api_status": None, "minerva_data": None})
+    st.session_state.history.append({"id": str(uuid.uuid4()),"role": "user", "content": query, "api_status": None, "minerva_data": None})
     
     # Process the query
     answer, api_status = process_query(query)
@@ -243,6 +258,7 @@ if query:
 
     # Add assistant response to history
     st.session_state.history.append({
+        "id": str(uuid.uuid4()),
         "role": "assistant", 
         "content": answer, 
         "api_status": api_status, 
@@ -256,7 +272,7 @@ for message in st.session_state.history:
         # Display Minerva raw data if available for assistant messages
         if message["role"] == "assistant" and message.get("minerva_data"):
              with st.expander("Minerva API Data Retrieved", expanded=False):
-                 st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True)
+                 st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True, key=message["id"])
         
         # Display API Call Status
         if message["role"] == "assistant" and message.get("api_status"):
@@ -265,7 +281,6 @@ for message in st.session_state.history:
                 minerva_status = message["api_status"]
                 if minerva_status["status"] == "success":
                     st.success(f"Status: {minerva_status['status']}")
-                    # st.text_area("Data Snippet:", value=str(minerva_status.get('data', ''))[:200]+"...", height=100, disabled=True)
                 elif minerva_status["status"] == "no_data_found":
                     st.warning(f"Status: {minerva_status['status']}")
                     st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
