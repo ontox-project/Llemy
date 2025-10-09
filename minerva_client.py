@@ -193,6 +193,13 @@ def format_reactions_for_llm(reactions_list: List[Dict[str, Any]], elements_df: 
     
     return "\n---\n".join(reaction_descriptions) # Join all reaction descriptions
 
+
+
+def format_link(base_url, project_id, reactions_list):
+    reactions_string = "%3B".join(map(str, reactions_list))
+    return f"{base_url}/minerva/index.html?id={project_id}&perfectMatch=true&searchValue={reactions_string}"
+
+
 @tool("minerva_map_data_retriever")
 def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID, machine_url: Optional[str] = BASE_URL) -> Dict[str, Any]:
     """

@@ -11,6 +11,7 @@ allowing users to ask questions about physiological maps and view answers.
 import streamlit as st
 from datetime import datetime, timedelta
 import time
+import uuid
 
 # --- Constants
 EXPIRATION_MINUTES = 20
@@ -22,21 +23,21 @@ def is_key_expired(timestamp):
 
 # --- Utility: Logout
 def clear_keys():
-    for key in ["api_key_oai", "api_key_oai_time", "api_key_pplx", "api_key_pplx_time"]:
+    for key in ["api_key_oai", "api_key_oai_time"]:
         st.session_state.pop(key, None)
     st.success("🔓 Logged out successfully!")
 
 # --- UI Layout: Title and logout button in one row
 col1, col2 = st.columns([12, 1])
 with col1:
-    st.title("🔐 API Keys Login")
+    st.title("🔐 API Key Login")
 with col2:
     if st.button("Logout"):
         clear_keys()
         st.rerun()
 
 # --- Initialize missing session keys
-for key in ["api_key_oai", "api_key_oai_time", "api_key_pplx", "api_key_pplx_time"]:
+for key in ["api_key_oai", "api_key_oai_time"]:
     if key not in st.session_state:
         st.session_state[key] = None
 
@@ -44,10 +45,6 @@ for key in ["api_key_oai", "api_key_oai_time", "api_key_pplx", "api_key_pplx_tim
 if is_key_expired(st.session_state.api_key_oai_time):
     st.session_state.api_key_oai = None
     st.session_state.api_key_oai_time = None
-
-if is_key_expired(st.session_state.api_key_pplx_time):
-    st.session_state.api_key_pplx = None
-    st.session_state.api_key_pplx_time = None
 
 # --- Prompt for OpenAI key if needed
 if not st.session_state.api_key_oai:
@@ -62,23 +59,10 @@ if not st.session_state.api_key_oai:
 else:
     st.success("✅ OpenAI API key is already set")
 
-# --- Prompt for Perplexity key if needed
-if not st.session_state.api_key_pplx:
-    api_key_pplx = st.text_input("Enter your Perplexity API key", type="password")
-    if api_key_pplx:
-        st.session_state.api_key_pplx = api_key_pplx
-        st.session_state.api_key_pplx_time = datetime.now()
-        st.success("✅ Perplexity API key set")
-    else:
-        st.warning("Please enter your Perplexity API key to continue.")
-        st.stop()
-else:
-    st.success("✅ Perplexity API key is already set")
-
 
 
 # Lazy import to avoid api key issues
-from workflow import assistant_chain, MODEL_NAME
+from workflow import api_chain, web_chain, MODEL_NAME
 from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID
 from minerva_utils import get_available_projects 
 
@@ -207,7 +191,7 @@ with st.sidebar:
     ]
 
     def set_prompt(example_text):
-        st.session_state.query = example_text
+        st.session_state.pending_query = example_text
 
     def shorten_text(text, max_chars=50):
         return text if len(text) <= max_chars else text[:max_chars-3] + "..."
@@ -231,8 +215,8 @@ with st.sidebar:
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "query" not in st.session_state:
-    st.session_state.query = ""
+if "queries" not in st.session_state:
+    st.session_state.queries = {}
 
 if "api_answer" not in st.session_state:
     st.session_state.api_answer = None
@@ -240,10 +224,26 @@ if "api_answer" not in st.session_state:
 if "final_answer" not in st.session_state:
     st.session_state.final_answer = None
 
+if "web_final_answer" not in st.session_state:
+    st.session_state.web_final_answer = None
+
+if "api_status" not in st.session_state:
+    st.session_state.api_status = None
+
+if "web_status" not in st.session_state:
+    st.session_state.web_status = {"status": "skipped"}
+
+if "pending_query" not in st.session_state:
+    st.session_state.pending_query = None
+
+
+
 # Function to process the query
 def process_query(query, run_web=False):
     start_time = time.time()
     
+    api_answer = None
+    web_answer = None
     api_status_details = None
     web_status_details = None
     
@@ -257,17 +257,37 @@ def process_query(query, run_web=False):
     if not selected_machine_url:
         st.error("No machine URL associated to project.")
         return "Error: No machine URL associated to project.", None, None
+    
     expertise = st.session_state.get("expertise")
 
-    with st.spinner(f"Retrieving knowledge from MINERVA project '{selected_project_id}' "):
+    with st.spinner(f"Retrieving knowledge"):
         try:
-            # Pass the selected project_id to the assistant_chain
-            result = assistant_chain.invoke({"question": query, "project_id": selected_project_id, "machine_url":selected_machine_url, "expertise": expertise,"run_web": run_web,})
-            api_answer = result.get("final_answer", "Error: No response generated.")
-            api_status_details = result.get("api_status_details", {"status": "unknown"})
-            web_status_details = result.get("web_status_details",{"status": "skipped"} if not run_web else {"status": "unknown"})
+            st.session_state.query = query  
+            if run_web:
+                web_result = web_chain.invoke({"question": query})
+                st.session_state.web_result = web_result
+
+                web_answer = web_result.get("data", "No data available")
+                web_status_details = web_result
+
+            else:
+                api_result = api_chain.invoke({
+                    "question": query,
+                    "project_id": selected_project_id,
+                    "machine_url": selected_machine_url,
+                })
+                st.session_state.api_result = api_result
+
+                # Get a synthesized answer from API alone
+                api_answer = api_result.get("final_answer", "Error: No response generated from API.")
+                api_status_details = api_result.get("api_status_details", {"status": "unknown"})
+                web_status_details = {"status": "skipped"}
+                #final_answer = api_answer
+
+
         except Exception as e:
             api_answer = f"Error processing your query: {str(e)}"
+            web_answer = f"Error processing your query: {str(e)}"
             # Ensure status details are initialized even on error to prevent NoneType issues later
             api_status_details = {"status": "error", "error_message": str(e)}
             web_status_details = {"status": "error", "error_message": str(e)}
@@ -275,84 +295,86 @@ def process_query(query, run_web=False):
     end_time = time.time()
     st.session_state.response_time = end_time - start_time
     
-    return api_answer, api_status_details, web_status_details
+    return api_answer, web_answer, api_status_details, web_status_details
 
 # Main chat interface
 query = st.chat_input("Ask about biology, transporters, or metabolism...", key="chat_input")
 
-# Process query from session state (if set by example button)
-if st.session_state.query and not query:
-    query = st.session_state.query
-    st.session_state.query = ""  # Clear it after use
+# Buffer example question if clicked
+if st.session_state.get("pending_query") and not query:
+    query = st.session_state.pending_query
+    st.session_state.pending_query = "" 
 
+# Process question
 if query:
+    query_id = str(uuid.uuid4())
+    st.session_state.queries[query_id] = {
+        "query": query,
+        "api_result": None,
+        "web_result": None
+    }
     # Add user query to history
-    st.session_state.history.append({"role": "user", "content": query, "api_status": None, "web_status": None, "minerva_data": None})
-    
+    st.session_state.history.append({
+        "id": query_id,
+        "message_id": str(uuid.uuid4()),
+        "role": "user",
+        "content": query,
+        "api_status": None,
+        "web_status": None,
+        "minerva_data": None
+    })
     # Process the query
-    api_answer, api_status, web_status = process_query(query, run_web=False)
-    st.session_state.api_answer = api_answer
-    st.session_state.final_answer = st.session_state.api_answer
+    api_answer, web_answer, api_status, web_status = process_query(query, run_web=False)
+    st.session_state.queries[query_id]["api_answer"] = api_answer
+    st.session_state.queries[query_id]["web_answer"] = web_answer
+    st.session_state.queries[query_id]["api_status"] = api_status
+    st.session_state.queries[query_id]["web_status"] = web_status
+ 
     
     # Extract Minerva raw data if available from the result
     minerva_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
 
     # Add assistant response to history
     st.session_state.history.append({
+        "id": query_id,
+        "message_id": str(uuid.uuid4()),
         "role": "assistant", 
         "content": api_answer, 
         "api_status": api_status, 
         "web_status": web_status,
-        "minerva_data": minerva_data # Store the raw Minerva data
+        "minerva_data": minerva_data 
     })
 
 
+last_query_id = next(
+    (m["id"] for m in reversed(st.session_state.history) if m["role"] == "user"),
+    None
+)
 
-# Display chat history
-for message in st.session_state.history:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        # Display Minerva raw data if available for assistant messages
-        if message["role"] == "assistant" and message.get("minerva_data"):
-             with st.expander("Minerva API Data Retrieved", expanded=False):
-                 st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True)
-        
-        # Display API Call Status
-        if message["role"] == "assistant" and message.get("api_status"):
-            with st.expander("API Call Status Details", expanded=False):
-                st.markdown("##### Minerva API")
-                minerva_status = message["api_status"]
-                if minerva_status["status"] == "success":
-                    st.success(f"Status: {minerva_status['status']}")
-                    # st.text_area("Data Snippet:", value=str(minerva_status.get('data', ''))[:200]+"...", height=100, disabled=True)
-                elif minerva_status["status"] == "no_data_found":
-                    st.warning(f"Status: {minerva_status['status']}")
-                    st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
-                else: # error
-                    st.error(f"Status: {minerva_status['status']}")
-                    st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
-
-                st.markdown("##### Perplexity API")
-                perplexity_status = message["web_status"]
-                if perplexity_status["status"] == "success":
-                    st.success(f"Status: {perplexity_status['status']}")
-                    # st.text_area("Data Snippet:", value=str(perplexity_status.get('data', ''))[:200]+"...", height=100, disabled=True)
-                else: # error
-                    st.error(f"Status: {perplexity_status['status']}")
-                    st.caption(f"Error: {perplexity_status.get('error_message', 'Unknown error')}")
-
-
-if st.session_state.api_answer and st.session_state.final_answer == st.session_state.api_answer:
+if last_query_id and st.session_state.queries[last_query_id]["web_status"]["status"]== "skipped" and st.session_state.queries[last_query_id]["api_status"] is not None:
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔍 I would like to search the web for further information"):
-            enriched = process_query(st.session_state.last_question, run_web=True)
-            st.session_state.final_answer = enriched
-            st.session_state.messages.append({"role": "assistant", "content": enriched})
-            st.experimental_rerun()
+        if st.button("🔍 I would like to search the web for further information", key=f"search_btn_{len(st.session_state.history)}"):
+            api_answer, web_answer, api_status, web_status = process_query(st.session_state.query, run_web=True)
+            st.session_state.queries[last_query_id]["web_answer"] = web_answer
+            st.session_state.queries[last_query_id]["web_status"] = web_status
+            st.session_state.history.append({
+                "id": last_query_id,
+                "message_id": str(uuid.uuid4()),
+                "role": "assistant",
+                "content": web_answer,
+                "api_status": {"status": "skipped"},
+                "web_status": web_status,
+                "minerva_data": None
+            })
+            st.rerun()
     with col2:
-        if st.button("✅ I have enough information"):
-            st.session_state.final_answer = st.session_state.api_answer
+        if st.button("✅ I have enough information", key=f"skip_btn_{len(st.session_state.history)}"):
+            st.session_state.ask_new_query = True
+            st.rerun()
+else:
+    st.session_state.ask_new_query = True
+    st.rerun()
 
 # Display a getting started message if history is empty
 if not st.session_state.history:
@@ -367,6 +389,34 @@ if not st.session_state.history:
     
     The system will combine information from the MINERVA API and web research to provide answers.
     """)
+
+# Display chat history
+else:
+    for message in st.session_state.history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            # Display Minerva raw data if available for assistant messages
+            if message["role"] == "assistant" and message.get("minerva_data"):
+                with st.expander("Minerva API Data Retrieved", expanded=False):
+                    st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True,key=f"assistant_output__{message['message_id']}")
+            
+            # Display API Call Status
+            if message["role"] == "assistant" and message.get("api_status"):
+                with st.expander("API Call Status Details", expanded=False):
+                    st.markdown("##### Minerva API")
+                    minerva_status = message["api_status"]
+                    if minerva_status["status"] == "success":
+                        st.success(f"Status: {minerva_status['status']}")
+                        # st.text_area("Data Snippet:", value=str(minerva_status.get('data', ''))[:200]+"...", height=100, disabled=True)
+                    elif minerva_status["status"] == "no_data_found":
+                        st.warning(f"Status: {minerva_status['status']}")
+                        st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
+                    else: # error
+                        st.error(f"Status: {minerva_status['status']}")
+                        st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
+
+                    st.markdown("##### Web search")
+                    st.warning(f"Logging needs to be redone for the web search")
 
 # Footer
 st.markdown("---")

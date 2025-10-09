@@ -1,10 +1,10 @@
 # LLMapperino
 
-A multi-agent system for answering specialized questions on physiological maps by combining structured knowledge from user-selected MINERVA API maps with web research via Perplexity.
+An agent system for answering specialized questions on physiological maps by combining structured knowledge from user-selected MINERVA API maps with web research (optionally).
 
 ## Overview
 
-LLMapperino is a prototype application that provides an intelligent interface for querying and retrieving information from MINERVA project maps. It uses a three-agent workflow:
+LLMapperino is a prototype application that provides an interface for querying and retrieving information from MINERVA project maps. It uses a three-agent workflow:
 
 1. **Minerva Agent**: Fetches and processes the full map data from a user-selected MINERVA project.
 2. **Perplexity Agent**: Performs deep web research using the Perplexity SONAR model.
@@ -22,7 +22,7 @@ graph TD
     end
 
     subgraph "Backend Workflow"
-        C --> D{1\. Parallel Data Retrieval};
+        C --> D{1\. Map Data Retrieval};
         D --> E[Minerva Agent];
         D --> F[Perplexity Agent];
 
@@ -58,20 +58,18 @@ graph TD
 
 - Natural language question answering
 - Integration with MINERVA API for structured map data
-- **User interface for selecting a MINERVA project to query.**
-- Web research using Perplexity for broader context
-- Parallel execution of data retrieval for faster responses
+- User interface for selecting a MINERVA project to query.
+- Optional web research using OpenAI for broader context
 - Chat-based Streamlit interface with example questions
 - Response time tracking
 - Error handling with automatic retries
-- **Displays detailed API call status and raw Minerva data for transparency.**
+- Detailed API call status and raw Minerva data displayed for transparency.
 
 ## Requirements
 
 - Python 3.10 or higher
 - API keys for:
-  - MINERVA API (via MINERVA_TOKEN in .env)
-  - Perplexity API
+  - MINERVA API (via MINERVA_TOKEN in .env) (optional, for now with public projects)
   - OpenAI API (for the synthesis agent)
 
 ## Installation
@@ -109,6 +107,8 @@ graph TD
    ```bash
    streamlit run app.py
    ```
+   
+2. The application will open in your web browser (typically at http://localhost:8501)
 
 ### Running with Docker
 
@@ -128,7 +128,6 @@ graph TD
 
 3. The application will open in your web browser (typically at http://localhost:8501)
 
-2. The application will open in your web browser (typically at http://localhost:8501)
 
 3. **Select a MINERVA project from the sidebar.**
 4. Enter your question in the chat input, or select one of the example questions from the sidebar.
@@ -173,10 +172,8 @@ LLMapperino/
 
 ## Future Improvements
 
-- Adding more specialized data sources beyond Minerva
-- Implementing agent reflection for self-verification of responses
+- Adding more specialized data sources beyond Minerva (OpenTargets, etc.)
 - Adding vector storage for caching and more efficient similar question handling
-- Creating a function-calling version that allows for more structured API queries
 - Adding visualization capabilities for molecular structures and pathways
 - Implementing fully asynchronous execution for faster response times
 
@@ -186,9 +183,9 @@ This project is intended for research and educational purposes only.
 
 ## Authors
 
-- Ivo Djidrovski (i.djidrovski@uu.nl)
 - Marie Corradi
 - Marek Ostaszewski
+- Ivo Djidrovski
 - Luiz Carlos Maia Ladeira 
 - Bernard Staumont
 
