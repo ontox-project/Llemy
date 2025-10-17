@@ -77,7 +77,7 @@ USER QUESTION:
 
 CONTEXT FROM MINERVA MAP DATA:
 Status: {api_status}
-Relevant Map Data (Reaction and Element Descriptions):
+Relevant Map Data (Reaction and Element Descriptions in JSON format):
 {api_content}
 Error (if any): {api_error}
 
@@ -117,7 +117,7 @@ def synth_agent_adapter(inputs: Dict[str, Any]) -> Dict[str, Any]:
 
     # --- Format API content ---
     api_content = api_result.get("data") or ""
-    if api_result.get("status") == "success" and api_content and not api_content.startswith("## Minerva API Results"):
+    if api_result.get("status") == "success" and api_content :
         api_content = f"## Minerva API Results\n\n{api_content}"
     elif api_result.get("status") == "error":
         api_content = "Error retrieving data from Minerva API."

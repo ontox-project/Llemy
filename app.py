@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Ivo Djidrovski, Marie Corradi
+# Copyright 2025 Marie Corradi
 
 """
-Streamlit UI for Fatty Acid Assistant
+Streamlit UI for Llemy
 
-This module provides a user interface for interacting with the Fatty Acid Assistant,
+This module provides a user interface for interacting with Llemy,
 allowing users to ask questions about lipid biology and view comprehensive answers.
 """
 
@@ -68,8 +68,8 @@ from minerva_utils import *
 
 # Set up the Streamlit page
 st.set_page_config(
-    page_title="LLMapperino",
-    page_icon="🧪",
+    page_title="Llemy",
+    page_icon="🧭",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -105,7 +105,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Application header
-st.markdown("<h1 class='main-header'>LLMapperino</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-header'>Llemy</h1>", unsafe_allow_html=True)
 st.markdown("<h3 class='sub-header'>An Agentic System for MINERVA Map Exploration</h3>", unsafe_allow_html=True)
 
 # Sidebar for settings and info
