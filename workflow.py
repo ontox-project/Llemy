@@ -60,7 +60,7 @@ Your answer should:
 
 Format the output with clearly delimited sections:
 - Each section should start with a bold title (using ** around the title).
-- Separate sections with two newlines.x
+- Separate sections with two newlines.
 
 Do not perform web search, restrict yourself to the context provided. 
 Do not ask the user if they would like further steps in your answer, restrict yourself to providing information only.
