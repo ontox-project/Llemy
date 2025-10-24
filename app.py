@@ -110,7 +110,6 @@ st.markdown("<h3 class='sub-header'>An Agentic System for MINERVA Map Exploratio
 
 # Sidebar for settings and info
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2021/2021815.png", width=100)
     st.markdown("## About")
     
     st.markdown("""
@@ -163,17 +162,23 @@ with st.sidebar:
     st.markdown("## Example Questions")
     
     example_questions = [
-        "List three specific inhibitors of CD36 and tell me which general molecular processes would be mainly impaired",
-        "Tell me an alternative to FATP2 if I want to test for the functionality of bile canalicular efflux",
-        "What protein or protein combinations should I measure if I want to assess HDL secretion?",
-        "In what organelle are fatty acids mainly stored in a cell system not expressing FABP1?",
-        "What are the differential molecular processes inhibited when PPAR alpha and PPAR gamma are inhibited?",
-        "Is PPAR alpha involved in the uptake of fatty acids?",
-        "How is BSEP related to fatty acid beta oxidation?",
-        "How does FATP1 inhibition in the liver affect the homeostasis of cholesterol?",
-        "Which cell types should I include in an in vitro model of steatohepatitis?",
-        "What is the abundance of FATP transporters in the liver?",
-        "Is valproic acid inhibitor of OTG2?"
+        "What is the scope of this map? Give me a brief summary of the biology represented.",
+        "What is the overall scope of the disease map (molecular, cellular, tissue, or organism-level)?",
+        "What are the inputs, regulators, and phenotypic outputs of this system?",
+        "Which triggers initiate the possible pathological response represented by this map, and which drivers maintain it?",
+        "What is the minimal causal chain from stimulus to clinical phenotypes represented in this map?",
+        "Where are the decision points (bifurcations) separating healthy versus diseased states?",
+        "Which regulatory checkpoints limit over-activation of the pathways leading to pathological phenotypes?",
+        "How does the microenvironment (inflammatory and metabolic) modulate core pathways?",
+        "Where do important convergences (many inputs connecting to one output) and divergences (one input connecting to many outputs) occur?",
+        "Which master nodes (hubs) control the largest number of relevant outputs?",
+        "Are there any inter-organelle interactions (nucleus, mitochondria, membrane, ER) mapped?",
+        "Which stress pathways (DNA damage, ER stress, oxidative stress, unfolded protein response) are represented in the map?",
+        "Where are the bottleneck nodes where there are no alternative paths?",
+        "Where in the map can you infer knowledge gaps?",
+        "Which sentinel nodes serve as proxies for system state?",
+        "Does the map capture temporal aspects (e.g. early vs late disease stages)?",
+        "Is the mapped system tissue- or cell-type specific? Or are there multiple tissues or cell-types represented?"
     ]
     
     def set_prompt(example_text):
@@ -292,9 +297,9 @@ for message in st.session_state.history:
 # Display a getting started message if history is empty
 if not st.session_state.history:
     st.info("""
-    ## Welcome to LLMapperino!
+    ## Welcome to Llemy!
     
-    Ask questions about the selected MINERVA project map.
+    Select a MINERVA map in the drop-down menu on the left, and ask questions about it.
     
     You can:
     - Type your own question in the input box below

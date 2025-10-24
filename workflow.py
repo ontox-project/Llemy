@@ -46,7 +46,7 @@ def api_agent(inputs: Dict[str, Any]) -> Dict[str, str]:
 # System prompt for the synthesis agent
 #TODO: make prompt more general
 SYNTH_SYSTEM_PROMPT = """
-You are a senior biomedical scientist specializing in hepatic lipid metabolism.
+You are a senior biomedical scientist specializing in systems biology.
 Your task is to synthesize information from MINERVA Map data to answer the user's QUESTION.
 **MINERVA Map Data** is a comprehensive dump of all reactions and elements from a specific metabolic map. It describes reactions, their participants (reactants, products, modifiers), and details about these elements (names, symbols, annotations). You will need to parse this information to find what's relevant to the QUESTION. Clearly label information derived from this source as "(Source: Minerva Map Data)". If the provided map data doesn't seem to contain information relevant to the QUESTION, state that. If there was an error retrieving this map data, that will be indicated.
 
@@ -56,8 +56,11 @@ Your answer should:
 - Directly address the user's QUESTION.
 - Be accurate and factual.
 - Explain complex concepts clearly.
-- Present information in a well-structured format with appropriate headings and clear separations between sections.
 - Explicitly state the source of each piece of information or the status of the data retrieval.
+
+Format the output with clearly delimited sections:
+- Each section should start with a bold title (using ** around the title).
+- Separate sections with two newlines.x
 
 Do not perform web search, restrict yourself to the context provided. 
 Do not ask the user if they would like further steps in your answer, restrict yourself to providing information only.
@@ -76,7 +79,7 @@ Relevant Map Data (Reaction and Element Descriptions in text blob format):
 {api_content}
 Error (if any): {api_error}
 
-Please synthesize a comprehensive answer to the USER QUESTION based on the available data from the map and noting any retrieval issues as instructed in the system prompt. Do not search the web for additional information.
+Synthesize a comprehensive answer to the USER QUESTION based on the available data from the map and noting any retrieval issues as instructed in the system prompt. Do not search the web for additional information.
 """
 
 # Create prompt template for synthesis

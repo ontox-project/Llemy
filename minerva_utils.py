@@ -117,19 +117,35 @@ def append_reaction_links(text, base_url, project_id):
     Works for bullet points, lists, and irregular sentence structures.
     """
 
-    # Split by newline or by punctuation + space (for both prose and bullet lists)
-    segments = re.split(r'(?:\n+|(?<=[.!?])\s+)', text.strip())
+    lines = text.splitlines()
+    updated_lines = []
 
-    updated_segments = []
-    for seg in segments:
-        if not seg.strip():
-            continue 
+    for line in lines:
+        # Detect table lines (very simple heuristic)
+        if line.strip().startswith('|') and line.strip().endswith('|'):
+            # Split cells
+            cells = [cell.strip() for cell in line.strip('|').split('|')]
+            updated_cells = []
+            for cell in cells:
+                reactions_list = extract_reaction_ids(cell)
+                if reactions_list:
+                    url = make_url(base_url, project_id, reactions_list)
+                    cell = f"{cell} ([link to MINERVA map]({url}))"
+                updated_cells.append(cell)
+            updated_line = "| " + " | ".join(updated_cells) + " |"
+            updated_lines.append(updated_line)
+        else:
+            # Normal text: split by sentence endings or newlines
+            segments = re.split(r'(?:\n+|(?<=[.!?])\s+)', line.strip())
+            updated_segments = []
+            for seg in segments:
+                if not seg.strip():
+                    continue
+                reactions_list = extract_reaction_ids(seg)
+                if reactions_list:
+                    url = make_url(base_url, project_id, reactions_list)
+                    seg = f"{seg.strip()} ([link to MINERVA map]({url}))"
+                updated_segments.append(seg.strip())
+            updated_lines.append(" ".join(updated_segments))
 
-        reactions_list = extract_reaction_ids(seg)
-        if reactions_list:
-            url = make_url(base_url, project_id, reactions_list)
-            seg = f"{seg.strip()} ([link to MINERVA map]({url}))"
-        updated_segments.append(seg.strip())
-
-    # Rejoin using newlines to preserve bullet formatting
-    return "\n".join(updated_segments)
+    return "\n".join(updated_lines)
