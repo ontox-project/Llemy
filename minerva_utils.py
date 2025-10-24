@@ -44,14 +44,15 @@ def get_available_projects():
 
         for project in projects_data.get('pageContent', []):
             # Ensure required keys exist before accessing
-            if all(k in project for k in ['machine', 'projectId', 'mapName', 'license', 'createdAt', 'disease']):
+            if all(k in project for k in ['machine', 'projectId', 'mapName', 'license', 'createdAt', 'disease', 'statusUpdatedAt']):
                 all_projects_list.append({
                     'machine': project['machine'].get('rootUrl'),
                     'project': project['projectId'],
                     'name': project['mapName'],
                     'license': project['license'],
                     'created': project['createdAt'],
-                    'disease': project['disease']
+                    'disease': project['disease'],
+                    'updated': project['statusUpdatedAt']
                 })
 
     if not all_projects_list:
@@ -89,7 +90,7 @@ def extract_reaction_ids(text):
     """
     # Match patterns like "Reaction ID(s): ..." or "Reactions ..."
     pattern = re.compile(
-        r"(?:Reactions?\s*(?:IDs?|ID)?[:\s]*)"      
+        r"(?:Reactions?\s*(?:IDs?|ID)?[:\s]*|RID[:\s]*)"      
         r"([\w\s,;and]+)",                        
         flags=re.IGNORECASE,
     )

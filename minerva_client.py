@@ -12,16 +12,14 @@ Handles authentication via anonymous login with fallback to a pre-saved token.
 
 #import os
 import httpx
-import tenacity
+#import tenacity
 #import functools
 from typing import Dict, List, Any, Optional
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from langchain.tools import tool
 import logging
-import requests
+import re
 import pandas as pd
-from minerva_utils import *
-import json
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -44,80 +42,141 @@ class MinervaClient(httpx.Client):
         log.debug(f"Calling MINERVA API: {method} {path} with params {kwargs.get('params')}")
         params = kwargs.pop("params", {})
 
-        # Optionally inject project ID
+        # Inject project ID
         if self.project_id and 'projectId' not in path and 'projectId' not in params:
             if path.startswith(("/projects/", "/models/", "/bioEntities/")) or "/models/" in path:
-                pass  # Do not auto-inject
+                pass  
             elif path.startswith(("/elements", "/reactions")):
                 params["projectId"] = self.project_id
 
         response = self.request(method, path, params=params, **kwargs)
         response.raise_for_status()
-        return response
+
+        if "application/json" in response.headers.get("content-type", ""):
+            return response.json()
+        log.warning(f"Non-JSON response from {path}. Content-Type: {response.headers.get('content-type')}")
+        return response.text
 
     def get_all_elements(self) -> List[Dict[str, Any]]:
         """Fetches all elements from the specified project map."""
-        elements_path = f"{self.base_url}/projects/{self.project_id}/models/{MAP_ID}/bioEntities/elements/"
+        elements_path = f"/projects/{self.project_id}/models/{MAP_ID}/bioEntities/elements/"
         log.info(f"Fetching all elements from: {elements_path}")
-        elements_data = requests.get(elements_path, cookies={"MINERVA_AUTH_TOKEN": ''})
-        elements= elements_data.text
-        return json.loads(elements)
+        elements_data = self._call_api("GET", elements_path)
+        return elements_data if isinstance(elements_data, list) else []
 
     def get_all_reactions(self) -> List[Dict[str, Any]]:
         """Fetches all reactions from the specified project map."""
-        reactions_path = f"{self.base_url}/projects/{self.project_id}/models/{MAP_ID}/bioEntities/reactions/"
+        reactions_path = f"/projects/{self.project_id}/models/{MAP_ID}/bioEntities/reactions/"
         log.info(f"Fetching all reactions from: {reactions_path}")
-        reactions_data = requests.get(reactions_path, cookies={"MINERVA_AUTH_TOKEN": ''})
-        reactions = reactions_data.text
-        return json.loads(reactions)
+        reactions_data = self._call_api("GET", reactions_path)
+        return reactions_data if isinstance(reactions_data, list) else []
 
+# --- Helper Functions for Formatting ---
 
-### Helper functions to transform MINERVA map data (elements and reactions) into a knowledge graph
-def simple_minerva_query_kg(elements_data, reactions_data, e_props=None, r_props=None):
-    def select_parameters_from_list(source_list, parameters_to_select):
-        ret = {}
-        for param_id in parameters_to_select:
-            if source_list[param_id]:
-               ret[param_id] = source_list[param_id]
+def simplify_element_description(element_id: int, elements_df: pd.DataFrame) -> str:
+    """Creates a simplified description for an element"""
+    if elements_df.empty or 'id' not in elements_df.columns:
+        return f"Element_ID_{element_id}"
+    
+    # Use .loc for potentially faster lookup if 'id' is index, or boolean indexing otherwise
+    element_rows = elements_df[elements_df['id'] == element_id]
+    if element_rows.empty:
+        return f"Element_ID_{element_id}_NotFound"
+    
+    element_series = element_rows.iloc[0]
 
-        if ret.get("references"):
-            ret["references"] = [{"database": ref["type"],
-                                  "database_id": ref["resource"]} for ref in ret["references"]]
+    name = element_series.get('name', 'UnknownName')
+    
+    # Handle potential non-list or None values gracefully
+    former_symbols_list = element_series.get('formerSymbols', [])
+    former_symbols = ",".join(str(s) for s in former_symbols_list if s) if isinstance(former_symbols_list, list) else ""
+    
+    references_list = element_series.get('references', [])
+    annotations = ""
+    if isinstance(references_list, list) and references_list:
+        ref_strings = []
+        for ref in references_list:
+             # Check if ref is a dict and has the required keys
+             if isinstance(ref, dict) and ref.get('type') and ref.get('resource'):
+                 ref_strings.append(f"{ref['type']}:{ref['resource']}")
+        if ref_strings:
+            annotations = ",".join(ref_strings)
 
-        return ret
+    desc = f"name: {name}"
+    if former_symbols:
+        desc += f" (formerSymbols: {former_symbols})"
+    if annotations:
+        desc += f" (annotations: {annotations})"
+    return desc
 
-    reduced_element_data = elements_data
-    if e_props is not None:
-        reduced_element_data = [select_parameters_from_list(el, e_props) for el in elements_data]
+def format_reactions_for_llm(reactions_list: List[Dict[str, Any]], elements_df: pd.DataFrame) -> str:
+    """Formats reactions into a detailed text blob for LLM processing, including reaction references."""
+    if not reactions_list:
+        return "No reactions found in the map."
 
-    reduced_reaction_data = reactions_data
-    if r_props is not None:
-        reduced_reaction_data = [select_parameters_from_list(rc, r_props) for rc in reactions_data]
+    reaction_descriptions = []
+    for reaction in reactions_list:
+        reaction_id = reaction.get('id', 'UnknownReactionID')
+        reaction_type = reaction.get('type', 'UnknownType')
+        name = reaction.get('name', '')
+        
+        # Build description line by line
+        lines = [f"RID: {reaction_id} ({name};{reaction_type}'):"]
 
-    def redefine_reaction(r):
-        r["reactants"] = [{"node_id": reactant["aliasId"]} for reactant in r["reactants"]]
-        r["sources"] = r.pop("reactants")
-        r["products"] = [{"node_id": product["aliasId"]} for product in r["products"]]
-        r["targets"] = r.pop("products")
-        if r.get("modifiers"):
-            r["modifiers"] = [{"node_id": modifier["aliasId"],
-                               "modification_type": modifier["type"]} for modifier in r["modifiers"]]
-        return r
+        # Format Participants
+        for participant_type in ["reactants", "products", "modifiers"]:
+            participants = reaction.get(participant_type, [])
+            participant_descs = []
+            if participants: # Ensure participants is a list and not empty
+                for p_info in participants:
+                    # Check if p_info is a dict and has 'aliasId'
+                    if isinstance(p_info, dict) and 'aliasId' in p_info:
+                         # Ensure aliasId is an integer before lookup
+                         try:
+                             alias_id = int(p_info['aliasId'])
+                             participant_descs.append(simplify_element_description(alias_id, elements_df))
+                         except (ValueError, TypeError):
+                             log.warning(f"Invalid aliasId format in reaction {reaction_id}, participant: {p_info}")
+                             participant_descs.append("InvalidElementID")
+                    # Fallback if participant is just an int ID 
+                    elif isinstance(p_info, int): 
+                        participant_descs.append(simplify_element_description(p_info, elements_df))
+                    else:
+                         log.warning(f"Unexpected participant format in reaction {reaction_id}: {p_info}")
+                         participant_descs.append("UnknownParticipantFormat")
 
-    reduced_reaction_data = [redefine_reaction(r) for r in reduced_reaction_data]
+            if participant_descs:
+                 lines.append(f"  {participant_type.capitalize()}: {'; '.join(participant_descs)}")
+            else:
+                lines.append(f"  {participant_type.capitalize()}: None")
 
-    return reduced_element_data, reduced_reaction_data
+        # Format Reaction-Level References 
+        reaction_refs_list = reaction.get('references', [])
+        reaction_ref_strings = []
+        if isinstance(reaction_refs_list, list) and reaction_refs_list:
+            for ref in reaction_refs_list:
+                if isinstance(ref, dict) and ref.get('type') and ref.get('resource'):
+                    reaction_ref_strings.append(f"{ref['type']}:{ref['resource']}")
+        
+        # Append reference string if references were found
+        if reaction_ref_strings:
+            ref_text = "|".join(reaction_ref_strings)
+            lines.append(f"  (References: {ref_text})") 
+            
+        reaction_descriptions.append("\n".join(lines)) 
 
-
-
+        descs = "\n".join(reaction_descriptions)
+        descs = re.sub(r"ENSEMBL:ENSG\d+", "", descs).replace(" name:", "") #remove ENSEMBL ids and "name" field names to decrease number of tokens
+    
+    return descs
 
 
 @tool("minerva_map_data_retriever")
 def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optional[str] = PROJECT_ID, machine_url: Optional[str] = BASE_URL) -> Dict[str, Any]:
     """
     Fetches all elements and reactions from the specified MINERVA project map
-    and formats them into a comprehensive text description including reaction references.
-    This tool provides the full context of the map for LLM reasoning.
+    and formats them into a text description including reaction references.
+    This tool provides the full context of the map for the LLM.
     
     Args:
         question: (Optional) The user's question, currently not used for filtering.
@@ -137,6 +196,14 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
             log.warning(f"No elements retrieved from the map for project ID: {effective_project_id}.")
             client.close()
             return {"status": "no_data_found", "data": f"No elements found in the map for project ID: {effective_project_id}.", "error_message": None}
+        
+        # Convert elements to DataFrame for efficient lookup
+        elements_df = pd.DataFrame(all_elements)
+        if 'id' not in elements_df.columns:
+             log.error("Element data missing 'id' column.")
+             client.close()
+             return {"status": "error", "data": None, "error_message": "Element data format error: missing 'id'."}
+        elements_df['id'] = elements_df['id'].astype(int) # Ensure ID is integer for matching
 
         log.info(f"Fetched {len(all_elements)} elements. Fetching all reactions for project ID: {effective_project_id}...")
         all_reactions = client.get_all_reactions()
@@ -145,10 +212,8 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
             client.close()
             return {"status": "no_data_found", "data": f"No reactions found in the map for project ID: {effective_project_id} (though elements were found).", "error_message": None}
 
-        log.info(f"Fetched {len(all_reactions)} reactions. JSON Formatting for LLM...")
-        formatted_data = simple_minerva_query_kg(all_elements, all_reactions,
-                                   e_props=["id", "name", "synonyms", "type", "references"],
-                                   r_props=["id", "type", "reactants", "products", "modifiers", "references"])
+        log.info(f"Fetched {len(all_reactions)} reactions. Formatting for LLM...")
+        formatted_data = format_reactions_for_llm(all_reactions, elements_df)
         client.close()
         
         return {"status": "success", "data": formatted_data, "error_message": None}
@@ -157,7 +222,7 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
         # Ensure client is closed even if error occurs after instantiation
         try:
             client.close()
-        except NameError: 
+        except NameError: # client might not be defined if error happened early
             pass 
         except Exception as close_e:
             log.error(f"Error closing MinervaClient after exception: {close_e}")
@@ -166,12 +231,12 @@ def minerva_map_data_retriever(question: Optional[str] = None, project_id: Optio
 
 if __name__ == "__main__":
     print("--- Testing Minerva API Client (Full Map Data Retrieval with Reaction Refs) ---")
-
+    
     result = minerva_map_data_retriever.invoke({}) 
     
     print(f"\nStatus: {result['status']}")
     if result['status'] == 'success':
-        print(f"\nFirst 1500 characters of formatted data:\n{result['data'][:1500]}...")
+        print(f"\nFirst 1500 characters of formatted data:\n{result['data'][:1500]}...") # Show more data
     elif result['error_message']:
         print(f"\nError: {result['error_message']}")
     else:

@@ -11,9 +11,8 @@ for answering physiological maps questions using the MINERVA API and Perplexity 
 
 from typing import Dict, Any
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
 from langchain.prompts import ChatPromptTemplate
-from langchain.schema.runnable import RunnableParallel, RunnablePassthrough, RunnableLambda
+from langchain.schema.runnable import RunnablePassthrough
 
 # Import our custom tools
 from minerva_client import minerva_map_data_retriever
@@ -51,23 +50,19 @@ You are a senior biomedical scientist specializing in hepatic lipid metabolism.
 Your task is to synthesize information from MINERVA Map data to answer the user's QUESTION.
 **MINERVA Map Data** is a comprehensive dump of all reactions and elements from a specific metabolic map. It describes reactions, their participants (reactants, products, modifiers), and details about these elements (names, symbols, annotations). You will need to parse this information to find what's relevant to the QUESTION. Clearly label information derived from this source as "(Source: Minerva Map Data)". If the provided map data doesn't seem to contain information relevant to the QUESTION, state that. If there was an error retrieving this map data, that will be indicated.
 
-Based on the user's QUESTION, analyze the detailed Minerva Map Data and the Perplexity Web Research (if included).
+Based on the user's QUESTION, analyze the detailed Minerva Map Data.
 Create a comprehensive, scientifically rigorous answer.
-If the sources provide conflicting information, prioritize peer-reviewed research and explain the discrepancy, clearly stating which source supports which claim.
 Your answer should:
 - Directly address the user's QUESTION.
 - Be accurate and factual.
 - Explain complex concepts clearly.
-- Highlight areas of scientific consensus and ongoing research questions relevant to the QUESTION.
-- Present information in a well-structured format with appropriate headings.
+- Present information in a well-structured format with appropriate headings and clear separations between sections.
 - Explicitly state the source of each piece of information or the status of the data retrieval.
 
 Do not perform web search, restrict yourself to the context provided. 
 Do not ask the user if they would like further steps in your answer, restrict yourself to providing information only.
 
-After each statement, give a structured list of pertinent references with hyperlinks.
-
-Remember to maintain scientific integrity and acknowledge any limitations in the available information.
+After each statement, give a structured list of pertinent reaction references from the map.
 """
 
 # Human prompt template for synthesis
@@ -77,11 +72,11 @@ USER QUESTION:
 
 CONTEXT FROM MINERVA MAP DATA:
 Status: {api_status}
-Relevant Map Data (Reaction and Element Descriptions in JSON format):
+Relevant Map Data (Reaction and Element Descriptions in text blob format):
 {api_content}
 Error (if any): {api_error}
 
-Please synthesize a comprehensive answer to the USER QUESTION based on the available data from all sources, clearly attributing information and noting any retrieval issues as instructed in the system prompt. Focus on finding information within the Minerva Map Data that is relevant to the USER QUESTION. Do not search the web for additional information.
+Please synthesize a comprehensive answer to the USER QUESTION based on the available data from the map and noting any retrieval issues as instructed in the system prompt. Do not search the web for additional information.
 """
 
 # Create prompt template for synthesis
