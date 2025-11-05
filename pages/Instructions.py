@@ -1,0 +1,26 @@
+import streamlit as st
+
+st.title("Instructions")
+
+st.subheader("Instructions")
+st.markdown("""
+1. Select the physiological map of interest in the side panel. You can only select a publicly available map.
+2. Enter your question in the chatbot. You can select a question from the sidebar, be aware that it will immediately be sent to the chatbot.
+3. The chatbot will retrieve the map data from the MINERVA API, synthetize a response and return it in the main page.
+4. If you agree with our informed consent, please tick the box and record your feedback on the response provided. Otherwise, go to 5.
+5. If you wish, ask another question. 
+6. Do not forget to also fill in the general questionnaire when you are done with testing. For that purpose, make sure to record your autmotically-generated ID.         
+""")
+
+st.subheader("Limitations")
+st.markdown("""
+- Be aware that all questions are independant: the answer will not build upon the answer to the previous question(s).
+- For optimal viewing, please disable dark mode in your browser.
+""")
+
+st.subheader("Contact details")
+st.markdown("""
+If you experience any technical issue please contact marie.corradi@hu.nl            
+""")
+
+st.page_link("app.py", label="⬅️ Back to Main Page", icon="🏠")

@@ -14,7 +14,7 @@ import time
 import uuid
 
 # --- Constants
-EXPIRATION_MINUTES = 30
+EXPIRATION_MINUTES = 60
 EXPIRATION_DELTA = timedelta(minutes=EXPIRATION_MINUTES)
 
 # --- Utility: Expiration check
@@ -60,11 +60,13 @@ else:
     st.success("✅ OpenAI API key is already set")
 
 
-
 # Lazy import to avoid api key issues
 from workflow import api_chain, MODEL_NAME
 from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID
 from minerva_utils import * 
+import json
+from codecarbon import EmissionsTracker
+
 
 # Set up the Streamlit page
 st.set_page_config(
@@ -110,13 +112,6 @@ st.markdown("<h3 class='sub-header'>An Agentic System for MINERVA Map Exploratio
 
 # Sidebar for settings and info
 with st.sidebar:
-    st.markdown("## About")
-    
-    st.markdown("""
-    Insert link to full documentation
-    """)
-    
-    st.markdown("---")
     st.markdown("## MINERVA Project Selection")
 
     # Fetch and cache available projects
@@ -195,12 +190,6 @@ with st.sidebar:
             args=(q,)
         )
     
-    st.markdown("---")
-    st.markdown("### Performance Metrics")
-    if "response_time" in st.session_state:
-        st.metric("Last Response Time", f"{st.session_state.response_time:.2f}s")
-
-
 # Initialize session state for chat history
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -208,8 +197,42 @@ if "history" not in st.session_state:
 if "query" not in st.session_state:
     st.session_state.query = ""
 
+if "feedback_log" not in st.session_state:
+    st.session_state.feedback_log = []
+
+if "page" not in st.session_state:
+    st.session_state.page = "main"
+
+if "emissions" not in st.session_state:
+    st.session_state.emissions = ""
+
+# Navigation function
+def go_to(page_name):
+    st.session_state.page = page_name
+
+# Feedback function
+def log_feedback(question, answer, feedback, response_time, emissions):
+    """Append feedback entry to session state and write to JSON file."""
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "question": question,
+        "answer": answer,
+        "feedback": feedback,
+        "response_time": response_time,
+        "emissions": emissions
+    }
+    st.session_state.feedback_log.append(entry)
+
+    # Save feedback to JSON file
+    with open("logs/feedback_log.json", "a", encoding="utf-8") as f:
+        json.dump(st.session_state.feedback_log, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 # Function to process the query
 def process_query(query):
+    tracker = EmissionsTracker()
+    tracker.start()
     start_time = time.time()
     
     api_status_details = None
@@ -239,11 +262,16 @@ def process_query(query):
             api_status_details = {"status": "error", "error_message": str(e)}
 
     end_time = time.time()
-    st.session_state.response_time = end_time - start_time
+    response_time = end_time - start_time
+    emissions = tracker.stop()
     
-    return answer, api_status_details
+    return answer, api_status_details, response_time, emissions
 
 # Main chat interface
+# Consent
+consent = st.checkbox("By ticking this box, I confirm that I have read the informed consent information, that I want to participate in the Llemy user research and agree to all the points described.",key=f"consent")
+st.page_link("pages/Consent.py", label="View informed consent details", icon="📝")
+
 query = st.chat_input("Ask about biology, transporters, or metabolism...", key="chat_input")
 
 # Process query from session state (if set by example button)
@@ -252,11 +280,12 @@ if st.session_state.query and not query:
     st.session_state.query = "" 
 
 if query:
+
     # Add user query to history
     st.session_state.history.append({"id": str(uuid.uuid4()),"role": "user", "content": query, "api_status": None, "minerva_data": None})
     
     # Process the query
-    answer, api_status = process_query(query)
+    answer, api_status, response_time, emissions = process_query(query)
     
     # Extract Minerva raw data if available from the result
     minerva_data = api_status.get("data") if api_status and api_status.get("status") == "success" else None
@@ -267,31 +296,96 @@ if query:
         "role": "assistant", 
         "content": answer, 
         "api_status": api_status, 
-        "minerva_data": minerva_data 
+        "minerva_data": minerva_data,
+        "response_time": response_time,
+        "emissions": emissions
     })
 
 # Display chat history
-for message in st.session_state.history:
+for i,message in enumerate(st.session_state.history):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        # Display Minerva raw data if available for assistant messages
-        if message["role"] == "assistant" and message.get("minerva_data"):
-             with st.expander("Minerva API Data Retrieved", expanded=False):
-                 st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True, key=message["id"])
-        
-        # Display API Call Status
-        if message["role"] == "assistant" and message.get("api_status"):
-            with st.expander("API Call Status Details", expanded=False):
-                st.markdown("##### Minerva API")
-                minerva_status = message["api_status"]
-                if minerva_status["status"] == "success":
-                    st.success(f"Status: {minerva_status['status']}")
-                elif minerva_status["status"] == "no_data_found":
-                    st.warning(f"Status: {minerva_status['status']}")
-                    st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
-                else: # error
-                    st.error(f"Status: {minerva_status['status']}")
-                    st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
+        if message["role"] == "assistant":
+            # Display feedback questionnaire if user consent
+            if consent:
+                st.markdown("## 💭 Please give feedback on this answer")
+                st.markdown("### Accuracy")
+                accuracy_score = st.radio(
+                    "Score (1 = Not Accurate at all - 5 = Very accurate):",
+                    options=[1, 2, 3, 4, 5],
+                    index=2,
+                    key=f"accuracy_score_{i}",
+                    horizontal=True
+                )
+                accuracy_comment = st.text_area(
+                    "Comment on accuracy:",
+                    placeholder="What was inaccurate?",
+                    key=f"accuracy_comment_{i}"
+                )
+
+                st.markdown("### Conciseness")
+                concise_score = st.radio(
+                    "Score (1 = Very verbose - 5 = Very concise):",
+                    options=[1, 2, 3, 4, 5],
+                    index=2,
+                    key=f"concise_score_{i}",
+                    horizontal=True
+                )
+
+                reliability_score = st.radio(
+                    "Score (1 = Not reliable at all - 5 = Very reliable):",
+                    options=[1, 2, 3, 4, 5],
+                    index=2,
+                    key=f"reliability_score_{i}",
+                    horizontal=True
+                )
+                reliability_comment = st.text_area(
+                    "Comment on reliability:",
+                    placeholder="How many references were unreliable?",
+                    key=f"reliability_comment_{i}"
+                )
+
+                if st.button("Submit Feedback", key=f"submit_{i}"):
+                    question = st.session_state.history[i - 1]["content"]
+                    answer = message["content"]
+                    response_time = message["response_time"]
+                    emissions = message["emissions"]
+
+                    feedback = {
+                        "accuracy": {
+                            "score": accuracy_score,
+                            "comment": accuracy_comment.strip() or None
+                        },
+                        "conciseness": {
+                            "score": concise_score
+                        },
+                        "reliability": {
+                            "score": reliability_score,
+                            "comment": reliability_comment.strip() or None
+                        },
+                    }
+
+                    log_feedback(question, answer, feedback, response_time, emissions)
+                    st.success("✅ Feedback saved, thank you!")
+
+            # Display Minerva raw data if available for assistant messages
+            if message.get("minerva_data"):
+                with st.expander("Minerva API Data Retrieved", expanded=False):
+                    st.text_area("Raw Data:", value=message["minerva_data"], height=200, disabled=True, key=message["id"])
+            
+            # Display API Call Status
+            if message.get("api_status"):
+                with st.expander("API Call Status Details", expanded=False):
+                    st.markdown("##### Minerva API")
+                    minerva_status = message["api_status"]
+                    if minerva_status["status"] == "success":
+                        st.success(f"Status: {minerva_status['status']}")
+                    elif minerva_status["status"] == "no_data_found":
+                        st.warning(f"Status: {minerva_status['status']}")
+                        st.caption(f"Details: {minerva_status.get('data', 'No specific message.')}")
+                    else: # error
+                        st.error(f"Status: {minerva_status['status']}")
+                        st.caption(f"Error: {minerva_status.get('error_message', 'Unknown error')}")
 
 
 # Display a getting started message if history is empty
@@ -304,6 +398,7 @@ if not st.session_state.history:
     You can:
     - Type your own question in the input box below
     - Try one of the example questions from the sidebar
+    All questions are independant from each other, Llemy uses only the data from the selected map to answer your question.
     """)
 
 # Footer
