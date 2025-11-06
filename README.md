@@ -13,7 +13,7 @@ Llemy is a prototype application that provides an interface for querying and ret
 ## Workflow
 
 ```mermaid
-graph TD {useMaxWidth:true}
+graph TD 
     subgraph "User Interface (Streamlit)"
         A{User} --> B[Selects MINERVA Project];
         A{User} --> C[Asks question];
@@ -44,6 +44,10 @@ graph TD {useMaxWidth:true}
         P(Display Final Answer) --> T(Logs);
         F[Response time and carbon emissions] --> T(Logs);
     end
+
+    style A fill:#A9CCE3,stroke:#000
+    style E fill:#A9CCE3,stroke:#000
+    style O fill:#A9CCE3,stroke:#000
 ```
 
 ## Features
