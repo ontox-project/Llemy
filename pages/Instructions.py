@@ -6,7 +6,7 @@ st.subheader("Instructions")
 st.markdown("""
 1. Select the map of interest in the side panel. You can only select a publicly available map.
 2. Enter your question in the chatbot. You can select a question from the sidebar, be aware that it will immediately be sent to the chatbot.
-3. The chatbot will retrieve the map data from the MINERVA API, synthetize a response and return it in the main page.
+3. The chatbot will retrieve the map data from the MINERVA API, synthetize a response and return it in the main page. Be patient, it can take a couple of minutes!
 4. If you agree with our informed consent, please tick the box and record your feedback on the response provided. Otherwise, go to 5.
 5. If you wish, ask another question. 
 6. Do not forget to also fill in the general questionnaire when you are done with testing. For that purpose, make sure to record your automatically-generated ID.         

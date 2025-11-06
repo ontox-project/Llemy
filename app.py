@@ -24,7 +24,7 @@ def is_key_expired(timestamp):
 
 # --- Utility: Logout
 def clear_keys():
-    for key in ["api_key_oai", "api_key_oai_time"]:
+    for key in ["api_key_oai", "api_key_oai_time", "hash"]:
         st.session_state.pop(key, None)
     st.success("🔓 Logged out successfully!")
 
@@ -38,7 +38,7 @@ with col2:
         st.rerun()
 
 # --- Initialize missing session keys
-for key in ["api_key_oai", "api_key_oai_time"]:
+for key in ["api_key_oai", "api_key_oai_time", "hash"]:
     if key not in st.session_state:
         st.session_state[key] = None
 
@@ -46,6 +46,7 @@ for key in ["api_key_oai", "api_key_oai_time"]:
 if is_key_expired(st.session_state.api_key_oai_time):
     st.session_state.api_key_oai = None
     st.session_state.api_key_oai_time = None
+    st.session_state.hash = None
 
 # --- Prompt for OpenAI key if needed
 if not st.session_state.api_key_oai:
@@ -62,9 +63,6 @@ else:
 
 
 # --- Prompt for unique hash
-if "hash" not in st.session_state:
-    st.session_state.hash = None
-
 if not st.session_state.hash:
     pwd = st.text_input("Enter a password to received a unique identifier. This will not be stored. Please remember your password for future sessions, or make sure to write down all IDs in the questionnaire.", type="password")
     if pwd:
