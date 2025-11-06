@@ -13,13 +13,12 @@ Llemy is a prototype application that provides an interface for querying and ret
 ## Workflow
 
 ```mermaid
-graph TD
+graph TD {useMaxWidth:true}
     subgraph "User Interface (Streamlit)"
         A{User} --> B[Selects MINERVA Project];
         A{User} --> C[Asks question];
         B[Selects MINERVA Project] --> D{Llemy Workflow};
         C[Asks question] --> D{Llemy Workflow};
-        D{Llemy Workflow} --> F[Response time and carbon emissions];
     end
 
     subgraph "Backend Workflow"
@@ -39,9 +38,10 @@ graph TD
     end
 
     subgraph "Logs (optional)"
+        D{Llemy Workflow} --> F[Response time and carbon emissions];
         S[User gives feedback] --> T(Logs);
         C[Asks question] --> T(Logs);
-        P[Display Final Answer] --> T(Logs);
+        P(Display Final Answer) --> T(Logs);
         F[Response time and carbon emissions] --> T(Logs);
     end
 ```
