@@ -45,9 +45,11 @@ graph TD
         F[Response time and carbon emissions] --> T(Logs);
     end
 
-    style A fill:#A9CCE3,stroke:#000
+    style A fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
+    style D fill:#9370DB,stroke:#000
     style E fill:#A9CCE3,stroke:#000
     style O fill:#A9CCE3,stroke:#000
+    style T fill:#D3D3D3,stroke:#000
 ```
 
 ## Features
