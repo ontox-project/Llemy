@@ -12,6 +12,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import time
 import uuid
+import hashlib
 
 # --- Constants
 EXPIRATION_MINUTES = 60
@@ -60,13 +61,35 @@ else:
     st.success("✅ OpenAI API key is already set")
 
 
+# --- Prompt for unique hash
+if "hash" not in st.session_state:
+    st.session_state.hash = None
+
+if not st.session_state.hash:
+    pwd = st.text_input("Enter a password to received a unique identifier. This will not be stored. Please remember your password for future sessions, or make sure to write down all IDs in the questionnaire.", type="password")
+    if pwd:
+        hash_pwd = pwd + st.session_state.api_key_oai
+        hash = hashlib.sha1(hash_pwd.encode("UTF-8")).hexdigest()
+        st.success(f"✅ Identifier set: {hash}. Please write it down for the survey.")
+        st.session_state.hash = hash
+    else:
+        st.warning("Please enter a password to continue")
+        st.stop()
+else:
+    st.success(f"✅ Unique identifier is already set: {st.session_state.hash}. Please write it down for the survey.")
+
+# Consent
+consent = st.checkbox("By ticking this box, I confirm that I have read and agree to the informed consent information and that I want to participate in the Llemy user research.",key=f"consent")
+st.page_link("pages/Consent.py", label="View informed consent details", icon="📝")
+
+
 # Lazy import to avoid api key issues
 from workflow import api_chain, MODEL_NAME
 from minerva_client import MinervaClient, PROJECT_ID as DEFAULT_PROJECT_ID
 from minerva_utils import * 
 import json
+from streamlit_extras.bottom_container import bottom
 from codecarbon import EmissionsTracker
-
 
 # Set up the Streamlit page
 st.set_page_config(
@@ -112,6 +135,11 @@ st.markdown("<h3 class='sub-header'>An Agentic System for MINERVA Map Exploratio
 
 # Sidebar for settings and info
 with st.sidebar:
+    st.image("https://static.vecteezy.com/system/resources/previews/016/314/451/large_2x/current-location-logo-world-map-location-logo-sign-map-graphic-free-png.png", width=100)
+    st.page_link("app.py", label="Home", icon="🏠")
+    st.page_link("pages/Consent.py", label="Informed consent form", icon="📝")
+    st.page_link("pages/Instructions.py", label="Instructions", icon="📖")
+    st.markdown("---")
     st.markdown("## MINERVA Project Selection")
 
     # Fetch and cache available projects
@@ -161,16 +189,10 @@ with st.sidebar:
         "What is the overall scope of the disease map (molecular, cellular, tissue, or organism-level)?",
         "What are the inputs, regulators, and phenotypic outputs of this system?",
         "Which triggers initiate the possible pathological response represented by this map, and which drivers maintain it?",
-        "What is the minimal causal chain from stimulus to clinical phenotypes represented in this map?",
-        "Where are the decision points (bifurcations) separating healthy versus diseased states?",
         "Which regulatory checkpoints limit over-activation of the pathways leading to pathological phenotypes?",
         "How does the microenvironment (inflammatory and metabolic) modulate core pathways?",
-        "Where do important convergences (many inputs connecting to one output) and divergences (one input connecting to many outputs) occur?",
-        "Which master nodes (hubs) control the largest number of relevant outputs?",
         "Are there any inter-organelle interactions (nucleus, mitochondria, membrane, ER) mapped?",
         "Which stress pathways (DNA damage, ER stress, oxidative stress, unfolded protein response) are represented in the map?",
-        "Where are the bottleneck nodes where there are no alternative paths?",
-        "Where in the map can you infer knowledge gaps?",
         "Which sentinel nodes serve as proxies for system state?",
         "Does the map capture temporal aspects (e.g. early vs late disease stages)?",
         "Is the mapped system tissue- or cell-type specific? Or are there multiple tissues or cell-types represented?"
@@ -211,7 +233,7 @@ def go_to(page_name):
     st.session_state.page = page_name
 
 # Feedback function
-def log_feedback(question, answer, feedback, response_time, emissions):
+def log_feedback(question, answer, feedback, response_time, emissions, hash):
     """Append feedback entry to session state and write to JSON file."""
     entry = {
         "timestamp": datetime.now().isoformat(),
@@ -219,7 +241,8 @@ def log_feedback(question, answer, feedback, response_time, emissions):
         "answer": answer,
         "feedback": feedback,
         "response_time": response_time,
-        "emissions": emissions
+        "emissions": emissions,
+        "user_hash": hash
     }
     st.session_state.feedback_log.append(entry)
 
@@ -268,9 +291,6 @@ def process_query(query):
     return answer, api_status_details, response_time, emissions
 
 # Main chat interface
-# Consent
-consent = st.checkbox("By ticking this box, I confirm that I have read the informed consent information, that I want to participate in the Llemy user research and agree to all the points described.",key=f"consent")
-st.page_link("pages/Consent.py", label="View informed consent details", icon="📝")
 
 query = st.chat_input("Ask about biology, transporters, or metabolism...", key="chat_input")
 
@@ -280,7 +300,6 @@ if st.session_state.query and not query:
     st.session_state.query = "" 
 
 if query:
-
     # Add user query to history
     st.session_state.history.append({"id": str(uuid.uuid4()),"role": "user", "content": query, "api_status": None, "minerva_data": None})
     
@@ -332,6 +351,8 @@ for i,message in enumerate(st.session_state.history):
                     horizontal=True
                 )
 
+                st.markdown("### Reliability")
+
                 reliability_score = st.radio(
                     "Score (1 = Not reliable at all - 5 = Very reliable):",
                     options=[1, 2, 3, 4, 5],
@@ -364,8 +385,9 @@ for i,message in enumerate(st.session_state.history):
                             "comment": reliability_comment.strip() or None
                         },
                     }
+                    hash = st.session_state.hash
 
-                    log_feedback(question, answer, feedback, response_time, emissions)
+                    log_feedback(question, answer, feedback, response_time, emissions,hash)
                     st.success("✅ Feedback saved, thank you!")
 
             # Display Minerva raw data if available for assistant messages
@@ -391,8 +413,6 @@ for i,message in enumerate(st.session_state.history):
 # Display a getting started message if history is empty
 if not st.session_state.history:
     st.info("""
-    ## Welcome to Llemy!
-    
     Select a MINERVA map in the drop-down menu on the left, and ask questions about it.
     
     You can:
@@ -401,12 +421,13 @@ if not st.session_state.history:
     All questions are independant from each other, Llemy uses only the data from the selected map to answer your question.
     """)
 
-# Footer
-st.markdown("---")
+with bottom():
+    st.markdown("---")
 
-st.markdown(f"""
-<small>This is a prototype application for research purposes only.  
-Developped with Streamlit, LangChain and OpenAI ({MODEL_NAME}). License Apache 2.0.</small>""", unsafe_allow_html=True)
+    st.markdown(f"""
+    <small>This is a prototype application for research purposes only.   
+    This work was developed in the context of the ONTOX project and VHP4Safety project.  
+    Developped with Streamlit, LangChain and OpenAI ({MODEL_NAME}). License Apache 2.0.</small>""", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     # This will only execute when the script is run directly

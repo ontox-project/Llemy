@@ -1,5 +1,6 @@
 # Core dependencies
 streamlit==1.50.0
+streamlit_extras
 langchain==0.3.27
 langchain-community==0.3.31
 langchain-openai==0.3.31
