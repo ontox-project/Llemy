@@ -1,57 +1,49 @@
-# LLMapperino
+# Llemy
 
-An agent system for answering specialized questions on physiological maps by combining structured knowledge from user-selected MINERVA API maps with web research (optionally).
+An agent system for answering specialized questions on physiological maps by combining structured knowledge from user-selected MINERVA API maps.
 
 ## Overview
 
-LLMapperino is a prototype application that provides an interface for querying and retrieving information from MINERVA project maps. It uses a three-agent workflow:
+Llemy is a prototype application that provides an interface for querying and retrieving information from MINERVA project maps. It uses a two-agent workflow:
 
 1. **Minerva Agent**: Fetches and processes the full map data from a user-selected MINERVA project.
-2. **Perplexity Agent**: Performs deep web research using the Perplexity SONAR model.
-3. **Synthesis Agent**: Combines information from both sources.
+2. **Synthesis Agent**: Generates an answer to the user question based on the map data.
 
-The system is designed to answer specialized questions by reasoning over the context of the selected MINERVA map and relevant web research.
 
 ## Workflow
 
 ```mermaid
 graph TD
     subgraph "User Interface (Streamlit)"
-        A[User Selects MINERVA Project] --> B;
-        B(User Asks Question) --> C{LLMapperino Workflow};
+        A{User} --> B[Selects MINERVA Project];
+        A{User} --> C[Asks question];
+        B[Selects MINERVA Project] --> D{Llemy Workflow};
+        C[Asks question] --> D{Llemy Workflow};
+        D{Llemy Workflow} --> F[Response time and carbon emissions];
     end
 
     subgraph "Backend Workflow"
-        C --> D{1\. Map Data Retrieval};
-        D --> E[Minerva Agent];
-        D --> F[Perplexity Agent];
+        D --> E([1\. Map Data Retrieval]);
+        E --> H[("MINERVA API <br> (Fetch Full Map Data)")];
 
-        E --> H["MINERVA API <br> (Fetch Full Map Data)"];
         H --> I[Structured Map Context];
 
-        F --> K["Perplexity API <br> (Web Research)"];
-        K --> L[Web Research Context];
-
-        I --> M{2\. Synthesize Information};
-        L --> M;
-        C --> M
-
-        M --> N["Synthesis Agent <br> (GPT-4.1 as Toxicologist)"];
-        N --> O{3\. Generate Comprehensive Answer};
+        I --> O(["2\. Generate answer <br> (Synthesis Agent, GPT-4.1 nano as systems biologist)"]);
     end
 
     subgraph "User Interface (Streamlit)"
-        O --> P[Display Final Answer];
+        O --> P(Display Final Answer);
         I --> Q(Display Raw Minerva Data);
         E --> R(Display Minerva API Status);
-        F --> S(Display Perplexity API Status);
+        P(Display Final Answer) --> S[User gives feedback];
     end
 
-    style C fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
-    style N fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
-    style D fill:#A9CCE3,stroke:#000
-    style M fill:#A9CCE3,stroke:#000
-    style O fill:#A9CCE3,stroke:#000
+    subgraph "Logs (optional)"
+        S[User gives feedback] --> T(Logs);
+        C[Asks question] --> T(Logs);
+        P[Display Final Answer] --> T(Logs);
+        F[Response time and carbon emissions] --> T(Logs);
+    end
 ```
 
 ## Features
@@ -59,18 +51,15 @@ graph TD
 - Natural language question answering
 - Integration with MINERVA API for structured map data
 - User interface for selecting a MINERVA project to query.
-- Optional web research using OpenAI for broader context
 - Chat-based Streamlit interface with example questions
-- Response time tracking
 - Error handling with automatic retries
 - Detailed API call status and raw Minerva data displayed for transparency.
+- Optional logging of feedback on answers
 
 ## Requirements
 
 - Python 3.10 or higher
-- API keys for:
-  - MINERVA API (via MINERVA_TOKEN in .env) (optional, for now with public projects)
-  - OpenAI API (for the synthesis agent)
+- API key for OpenAI API (for the synthesis agent)
 
 ## Installation
 
@@ -78,26 +67,15 @@ graph TD
 
 2. Navigate to the project directory:
    ```bash
-   cd LLMapperino
+   cd Llemy
    ```
 
-3. Set up a virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
 
-4. Install the required dependencies:
+3. Install the required dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-5. Create a `.env` file with your API keys:
-   ```
-   MINERVA_TOKEN=your_minerva_token_here
-   PPLX_API_KEY=your_perplexity_api_key_here
-   OPENAI_API_KEY=your_openai_api_key_here
-   ```
 
 ## Usage
 
@@ -112,18 +90,16 @@ graph TD
 
 ### Running with Docker
 
-1. Build the Docker image from the `LLMapperino/` directory:
+1. Build the Docker image from the `Llemy/` directory:
    ```bash
-   docker build -t llmapperino .
+   docker build -t llemy .
    ```
 
 2. Run the Docker container, mapping the port and passing your API keys as environment variables:
    ```bash
    docker run -p 8501:8501 \
-     -e MINERVA_TOKEN="your_minerva_token_here" \
-     -e PPLX_API_KEY="your_perplexity_api_key_here" \
-     -e OPENAI_API_KEY="your_openai_api_key_here" \
-     llmapperino:latest
+     -v $(pwd)/logs:/app/logs \  #to record logs
+     llemy:latest
    ```
 
 3. The application will open in your web browser (typically at http://localhost:8501)
@@ -136,36 +112,43 @@ graph TD
 
 ## Example Questions
 
-- List three specific inhibitors of CD36 and tell me which general molecular processes would be mainly impaired
-- Tell me an alternative to FATP2 if I want to test for the functionality of bile canalicular efflux
-- What protein or protein combinations should I measure if I want to assess HDL secretion?
-- In what organelle are fatty acids mainly stored in a cell system not expressing FABP1?
-- What are the differential molecular processes inhibited when PPAR alpha and PPAR gamma are inhibited?
-- Is PPAR alpha involved in the uptake of fatty acids?
-- How is BSEP related to fatty acid beta oxidation?
-- How does FATP1 inhibition in the liver affect the homeostasis of cholesterol?
-- Which cell types should I include in an in vitro model of steatohepatitis?
-- What is the abundance of FATP transporters in the liver?
-- Is valproic acid inhibitor of OTG2?
+- What is the scope of this map? Give me a brief summary of the biology represented.
+- What is the overall scope of the disease map (molecular, cellular, tissue, or organism-level)?
+- What are the inputs, regulators, and phenotypic outputs of this system?
+- Which triggers initiate the possible pathological response represented by this map, and which drivers maintain it?
+- Which regulatory checkpoints limit over-activation of the pathways leading to pathological phenotypes?
+- How does the microenvironment (inflammatory and metabolic) modulate core pathways?
+- Are there any inter-organelle interactions (nucleus, mitochondria, membrane, ER) mapped?
+- Which stress pathways (DNA damage, ER stress, oxidative stress, unfolded protein response) are represented in the map?
+- Which sentinel nodes serve as proxies for system state?
+- Does the map capture temporal aspects (e.g. early vs late disease stages)?
+- Is the mapped system tissue- or cell-type specific? Or are there multiple tissues or cell-types represented?
 
 ## Project Structure
 
 ```
-LLMapperino/
-├── .env                  # Environment variables (API keys)
+Llemy/
 ├── requirements.txt      # Project dependencies
 ├── README.md             # This file
 ├── Dockerfile            # Docker build instructions
 ├── .dockerignore         # Files to ignore when building Docker image
+├── config.py             # Helper functions to prompt for API keys
+├── __init__.py           # To make it a python package
 ├── minerva_client.py     # MINERVA API client
-├── perplexity_client.py  # Perplexity API client
+├── minerva_utils.py      # Helper functions to get MINERVA public projects list and structure links to maps in LLM answer
 ├── workflow.py           # LangChain agent workflow
-└── app.py                # Streamlit UI application
+└── app.py                # Main page of the Streamlit UI application
+└── pages                 # multi-page app
+   └── Consent.py         # informed consent information
+   └── Instructions.py    # instructions to use the app
+└── logs                  # to record feedback ; optional. also logs carbon usage and processing time
+└── .streamlit            
+   └── config.toml        # Streamlit config file
+
 ```
 
 ## Troubleshooting
 
-- **Missing API Keys**: Ensure all API keys are correctly set in the `.env` file
 - **Module Import Errors**: Verify that all dependencies are installed correctly
 - **API Timeouts**: The application includes retry logic for API calls, but persistent timeouts may indicate API service issues
 - **Memory Issues**: For complex queries, ensure your system has sufficient memory
@@ -176,6 +159,8 @@ LLMapperino/
 - Adding vector storage for caching and more efficient similar question handling
 - Adding visualization capabilities for molecular structures and pathways
 - Implementing fully asynchronous execution for faster response times
+- Import maps as KGs
+- Prompt parsing (entity recognition, concept matching for RAG)
 
 ## License
 
@@ -191,8 +176,5 @@ This project is intended for research and educational purposes only.
 
 ## Acknowledgements
 
-- This project was a collaboration between ONTOX, VHP4Safety,and Elixir Europe.
-- MINERVA API (via ontox.elixir-luxembourg.org) for providing structured data on liver lipid metabolism
-- Perplexity for web research capabilities
-- LangChain for the agent orchestration framework
-- Streamlit for the user interface
+- This project was a collaboration between ONTOX, ELIXIR-LU and VHP4Safety.
+- MINERVA API for providing structured data physiological/disease maps.
