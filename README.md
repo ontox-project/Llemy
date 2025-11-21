@@ -46,7 +46,7 @@ graph TD
     end
 
     style A fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
-    style D fill:#9370DB,stroke:#000
+    style D fill:#DDA0DD,stroke:#000
     style E fill:#A9CCE3,stroke:#000
     style O fill:#A9CCE3,stroke:#000
     style T fill:#D3D3D3,stroke:#000

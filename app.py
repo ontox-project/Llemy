@@ -14,21 +14,21 @@ import time
 import uuid
 import hashlib
 
-# --- Constants
+# Constants
 EXPIRATION_MINUTES = 60
 EXPIRATION_DELTA = timedelta(minutes=EXPIRATION_MINUTES)
 
-# --- Utility: Expiration check
+# Utility: Expiration check
 def is_key_expired(timestamp):
     return not timestamp or (datetime.now() - timestamp > EXPIRATION_DELTA)
 
-# --- Utility: Logout
+# Utility: Logout
 def clear_keys():
     for key in ["api_key_oai", "api_key_oai_time", "hash"]:
         st.session_state.pop(key, None)
     st.success("🔓 Logged out successfully!")
 
-# --- UI Layout: Title and logout button in one row
+
 col1, col2 = st.columns([12, 1])
 with col1:
     st.title("🔐 API Key Login")
@@ -37,18 +37,18 @@ with col2:
         clear_keys()
         st.rerun()
 
-# --- Initialize missing session keys
+# Initialize missing session keys
 for key in ["api_key_oai", "api_key_oai_time", "hash"]:
     if key not in st.session_state:
         st.session_state[key] = None
 
-# --- Expire if keys too old
+# Expire if keys are too old
 if is_key_expired(st.session_state.api_key_oai_time):
     st.session_state.api_key_oai = None
     st.session_state.api_key_oai_time = None
     st.session_state.hash = None
 
-# --- Prompt for OpenAI key if needed
+# Prompt for OpenAI key if needed
 if not st.session_state.api_key_oai:
     api_key_oai = st.text_input("Enter your OpenAI API key", type="password")
     if api_key_oai:
@@ -62,7 +62,7 @@ else:
     st.success("✅ OpenAI API key is already set")
 
 
-# --- Prompt for unique hash
+# Prompt for unique hash
 if not st.session_state.hash:
     pwd = st.text_input("Enter a password to received a unique identifier. This will not be stored. Please remember your password for future sessions, or make sure to write down all IDs in the questionnaire.", type="password")
     if pwd:
@@ -76,9 +76,43 @@ if not st.session_state.hash:
 else:
     st.success(f"✅ Unique identifier is already set: {st.session_state.hash}. Please write it down for the survey.")
 
-# Consent
-consent = st.checkbox("By ticking this box, I confirm that I have read and agree to the informed consent information and that I want to participate in the Llemy user research.",key=f"consent")
+# Consent with resized checkbox
+st.markdown("""
+<style>
+
+div[data-testid="stCheckbox"] input[type="checkbox"] {
+    width: 25px;
+    height: 25px;
+}
+
+div[data-testid="stCheckbox"] label {
+    font-size: 22px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+if "consent_once" not in st.session_state:
+    st.session_state.consent_once = False
+if "consent" not in st.session_state:
+    st.session_state.consent = None
+options=["Yes", "No"]
+consent = st.radio(
+    "I have read and agree to the informed consent information and I want to participate in the Llemy user research.",
+    options,
+    index=options.index(st.session_state.consent) if st.session_state.consent else None,
+    horizontal=True
+)
 st.page_link("pages/Consent.py", label="View informed consent details", icon="📝")
+
+st.session_state.consent = consent
+if consent is not None and not st.session_state.consent_once:
+    st.session_state.consent_once = True
+
+# --- Gate content until first answer is made ---
+if not st.session_state.consent_once:
+    st.warning("Please answer the consent question to continue.")
+    st.stop()
 
 
 # Lazy import to avoid api key issues
@@ -97,7 +131,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better appearance
+# Custom CSS 
 st.markdown("""
 <style>
     .main-header {
@@ -174,6 +208,8 @@ with st.sidebar:
     elif "minerva_projects" in st.session_state:
         st.warning("No MINERVA projects available or failed to load.")
 
+    st.page_link(f"{st.session_state.selected_machine_url}index.html?id={st.session_state.selected_minerva_project_id}", label="View selected map", icon="🔎")
+
 
     @st.cache_resource
     def get_minerva_client(base_url: str) -> MinervaClient:
@@ -231,10 +267,11 @@ def go_to(page_name):
     st.session_state.page = page_name
 
 # Feedback function
-def log_feedback(question, answer, feedback, response_time, emissions, hash):
+def log_feedback(map,question, answer, feedback, response_time, emissions, hash):
     """Append feedback entry to session state and write to JSON file."""
     entry = {
         "timestamp": datetime.now().isoformat(),
+        "map": map,
         "question": question,
         "answer": answer,
         "feedback": feedback,
@@ -324,7 +361,7 @@ for i,message in enumerate(st.session_state.history):
         st.markdown(message["content"])
         if message["role"] == "assistant":
             # Display feedback questionnaire if user consent
-            if consent:
+            if st.session_state.consent == "Yes":
                 st.markdown("## 💭 Please give feedback on this answer")
                 st.markdown("### Accuracy")
                 accuracy_score = st.radio(
@@ -384,8 +421,9 @@ for i,message in enumerate(st.session_state.history):
                         },
                     }
                     hash = st.session_state.hash
+                    map = st.session_state.selected_minerva_project_id
 
-                    log_feedback(question, answer, feedback, response_time, emissions,hash)
+                    log_feedback(map,question, answer, feedback, response_time, emissions,hash)
                     st.success("✅ Feedback saved, thank you!")
 
             # Display Minerva raw data if available for assistant messages
