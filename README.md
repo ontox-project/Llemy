@@ -13,43 +13,59 @@ Llemy is a prototype application that provides an interface for querying and ret
 ## Workflow
 
 ```mermaid
-graph TD 
-    subgraph "User Interface (Streamlit)"
-        A{User} --> B[Selects MINERVA Project];
-        A{User} --> C[Asks question];
-        B[Selects MINERVA Project] --> D{Llemy Workflow};
-        C[Asks question] --> D{Llemy Workflow};
-    end
+flowchart TB
 
-    subgraph "Backend Workflow"
-        D --> E([1\. Map Data Retrieval]);
-        E --> H[("MINERVA API <br> (Fetch Full Map Data)")];
+%% Nodes
+A["👤 User"]
+B["🧭 Map selection"]
+C["🔎 Question"]
+D["🤖 Retrieval agent"]
+D0["🧾 Map content"]
+C0["💬 Engineered prompt"]
+E["🧠 LLM synthesis agent"]
+F["🕓 Response time"]
+G["🧾 Answer<br/>Including references"]
+H["🌐 System status"]
+I["📊 User feedback"]
+J["♻️ Carbon emissions (beta)"]
+K["💾 Logs"]
 
-        H --> I[Structured Map Context];
 
-        I --> O(["2\. Generate answer <br> (Synthesis Agent, GPT-4.1 nano as systems biologist)"]);
-    end
+%% Flow
+A --> B
+A --> C
+B --> D
+C --> C0
+D --> D0
+C0 --> E
+D0 --> E
+E --> F
+E --> G
+E --> H
+E --> J
+F -- "evaluation form" --> I
+G --> I
+F --> K
+G --> K
+I --> K
+J --> K
 
-    subgraph "User Interface (Streamlit)"
-        O --> P(Display Final Answer);
-        I --> Q(Display Raw Minerva Data);
-        E --> R(Display Minerva API Status);
-        P(Display Final Answer) --> S[User gives feedback];
-    end
+%% Base styling
+classDef default fill:#f7f7f7,stroke:#4a4a4a,stroke-width:1.2px,rx:8,ry:8;
 
-    subgraph "Logs (optional)"
-        D{Llemy Workflow} --> F[Response time and carbon emissions];
-        S[User gives feedback] --> T(Logs);
-        C[Asks question] --> T(Logs);
-        P(Display Final Answer) --> T(Logs);
-        F[Response time and carbon emissions] --> T(Logs);
-    end
+%% Emphasis nodes (thicker border)
+classDef emphasis fill:#f7f7f7,stroke:#000000,stroke-width:3px,rx:8,ry:8;
 
-    style A fill:#2E86C1,stroke:#000,stroke-width:2px,color:#fff
-    style D fill:#DDA0DD,stroke:#000
-    style E fill:#A9CCE3,stroke:#000
-    style O fill:#A9CCE3,stroke:#000
-    style T fill:#D3D3D3,stroke:#000
+class D,E emphasis;
+
+%% Force same-row alignment hints
+B --- C
+C0 --- D0
+
+%% slightly thicker key edges
+linkStyle 3 stroke-width:1.5px
+linkStyle 6 stroke-width:1.5px
+```
 ```
 
 ## Features
@@ -94,7 +110,7 @@ graph TD
    
 2. The application will open in your web browser (typically at http://localhost:8501)
 
-### Running with Docker
+### Running with Docker (recommended)
 
 1. Build the Docker image from the `Llemy/` directory:
    ```bash
