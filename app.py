@@ -28,8 +28,8 @@ def clear_keys():
         st.session_state.pop(key, None)
     st.success("🔓 Logged out successfully!")
 
-
-col1, col2 = st.columns([12, 1])
+st.set_page_config(page_title="Llemy",page_icon="🧭")
+col1, col2 = st.columns([12, 2])
 with col1:
     st.title("🔐 API Key Login")
 with col2:
