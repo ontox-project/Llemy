@@ -25,9 +25,9 @@ C0["💬 Engineered prompt"]
 E["🧠 LLM synthesis agent"]
 F["🕓 Response time"]
 G["🧾 Answer<br/>Including references"]
+J["♻️ Carbon emissions (beta)"]
 H["🌐 System status"]
 I["📊 User feedback"]
-J["♻️ Carbon emissions (beta)"]
 K["💾 Logs"]
 
 
@@ -41,14 +41,14 @@ C0 --> E
 D0 --> E
 E --> F
 E --> G
-E --> H
 E --> J
-F -- "evaluation form" --> I
-G --> I
-F --> K
-G --> K
-I --> K
-J --> K
+F --> I
+E --> H
+G --"evaluation form" --> I
+F -.-> K
+G -.-> K
+I -.-> K
+J -.-> K
 
 %% Base styling
 classDef default fill:#f7f7f7,stroke:#4a4a4a,stroke-width:1.2px,rx:8,ry:8;
@@ -58,9 +58,6 @@ classDef emphasis fill:#f7f7f7,stroke:#000000,stroke-width:3px,rx:8,ry:8;
 
 class D,E emphasis;
 
-%% Force same-row alignment hints
-B --- C
-C0 --- D0
 
 %% slightly thicker key edges
 linkStyle 3 stroke-width:1.5px
