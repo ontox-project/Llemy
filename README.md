@@ -172,14 +172,12 @@ Llemy/
 - **API Timeouts**: The application includes retry logic for API calls, but persistent timeouts may indicate API service issues
 - **Memory Issues**: For complex queries, ensure your system has sufficient memory
 
-## Future Improvements
+## Roadmap
 
-- Adding more specialized data sources beyond Minerva (OpenTargets, etc.)
-- Adding vector storage for caching and more efficient similar question handling
-- Adding visualization capabilities for molecular structures and pathways
-- Implementing fully asynchronous execution for faster response times
-- Import maps as KGs
-- Prompt parsing (entity recognition, concept matching for RAG)
+- Improve response time
+- Improve references
+- Implement dedicated workflows for summarising, querying, and analysing the map
+- Programmatic integration of Llemy functionalities with the GUI of the MINERVA Platform
 
 ## License
 
