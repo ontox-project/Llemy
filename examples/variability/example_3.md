@@ -9,7 +9,10 @@
 
 **User query (from Llemy suggestions):** What is the scope of this map? Give me a brief summary of the biology represented.
 
+<<<<<<< HEAD
 **Response time:** 86.7s
+=======
+>>>>>>> 8327edd5149d3773dffad609be489df6062bf39f
 
 # Answer from the system
 
