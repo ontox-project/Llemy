@@ -8,7 +8,7 @@
 ## Query
 
 **User query (redacted):** 
-Summarise the role of Nampt in ageing.
+Summarise the role of NAMPT in ageing.
 
 **Question category:** Summarise
 
