@@ -8,7 +8,7 @@
 ## Query
 
 **User query (redacted):** 
-Find PubMed IF for RID: 55717.
+Find PubMed ID for RID: 55717.
 
 **Question category:** Find
 
