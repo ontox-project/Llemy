@@ -185,7 +185,7 @@ This project is intended for research and educational purposes only.
 
 ## Deployment
 
-This project is deployed for public access at llemy.vhp4safety.nl. A [user manual](llemy_manual.pdf) is available in this repository.
+This project is deployed for public access [here](llemy.vhp4safety.nl). A [user manual](llemy_manual.pdf) is available in this repository.
 
 ## Authors
 
