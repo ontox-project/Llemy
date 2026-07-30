@@ -20,7 +20,7 @@ Do not ask the user if they would like further steps in your answer, restrict yo
 
 After each statement, give a structured list of pertinent reaction references from the map"
 
-# Example system prompt
+# Example system prompt (Liver Lipid Metabolism Map of the [ONTOX project](https://ontox-project.eu/)
 
 "USER QUESTION:"What is the scope of this map? Give me a brief summary of the biology represented"
 
