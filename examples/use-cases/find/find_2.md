@@ -5,6 +5,8 @@
 **Accessed map:**
 [Cytokine Release Syndrome Adverse Outcome Pathway Map](https://imsavar.elixir-luxembourg.org/minerva?id=CRSmap123)
 
+**Reference:** https://disease-maps.io/crs
+
 ## Query
 
 **User query (redacted):** 

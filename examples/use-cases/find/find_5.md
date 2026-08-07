@@ -5,6 +5,8 @@
 **Accessed map:**
 [SYSCID map](https://syscid.elixir-luxembourg.org/minerva/index.html?id=SYSCID_map_4-3) 
 
+**Reference:** https://disease-maps.io/syscid
+
 ## Query
 
 **User query (redacted):** 

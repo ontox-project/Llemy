@@ -5,6 +5,8 @@
 **Accessed map:** 
 [PD map](https://pdmap.uni.lu/minerva/index.html?id=pd_map_autumn_25)
 
+**Reference:** https://disease-maps.io/parkinsons
+
 ## Query and feedback
 
 **User query (redacted):** How does the microbiome contribute to PD?

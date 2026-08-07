@@ -5,6 +5,8 @@
 **Accessed map:**
 [Expobiome map v2](https://expobiome.lcsb.uni.lu/minerva/index.html?id=expobiome_map_v2r14)
 
+**Reference:** https://doi.org/10.1016/j.chom.2022.08.015
+
 ## Query
 
 **User query (redacted):** 

@@ -5,6 +5,8 @@
 **Accessed map:**
 [Asthma map](https://asthma.uni.lu/minerva/index.html?id=asthma_map_bg) 
 
+**Reference:** https://disease-maps.io/asthma
+
 ## Query
 
 **User query (redacted):** 
