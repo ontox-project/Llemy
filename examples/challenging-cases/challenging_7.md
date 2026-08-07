@@ -5,6 +5,8 @@
 **Accessed map:**
 [COVID-19 map](https://covid19map.elixir-luxembourg.org/minerva/index.html?id=covid19_map_10Jan25)
 
+**Reference:** https://disease-maps.io/covid-19
+
 ## Query and feedback
 
 **User query (redacted):** Indicate 10 key reactions of the map

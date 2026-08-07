@@ -5,6 +5,8 @@
 **Accessed map:** 
 [Liver Lipid Metabolism (ONTOX)](https://ontox.elixir-luxembourg.org/minerva/index.html?id=Liver_Lipid_Metabolism_Physiological_Map_August_2024)
 
+**Reference:** https://disease-maps.io/cholestasis
+
 ## Query
 
 **User query (redacted):** 
